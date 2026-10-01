@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- layout_mode_tabs.xml — Mode tabs (Design / Blueprint / Code).
+     Inclut via <include> dans activity_editor.xml. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:padding="8dp"
+    android:background="@color/editor_surface">
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/tabDesign"
+        style="@style/Widget.LayoutEditor.ModeTab"
+        android:layout_width="0dp"
+        android:layout_weight="1"
+        app:icon="@drawable/ic_mode_design"
+        app:iconSize="17dp"
+        app:iconTint="@color/editor_on_surface_3"
+        android:text="@string/mode_design" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/tabBlueprint"
+        style="@style/Widget.LayoutEditor.ModeTab"
+        android:layout_width="0dp"
+        android:layout_weight="1"
+        app:icon="@drawable/ic_mode_blueprint"
+        app:iconSize="17dp"
+        app:iconTint="@color/editor_on_surface_3"
+        android:text="@string/mode_blueprint" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/tabCode"
+        style="@style/Widget.LayoutEditor.ModeTab"
+        android:layout_width="0dp"
+        android:layout_weight="1"
+        app:icon="@drawable/ic_mode_code"
+        app:iconSize="17dp"
+        app:iconTint="@color/editor_on_surface_3"
+        android:text="@string/mode_code" />
+</LinearLayout>

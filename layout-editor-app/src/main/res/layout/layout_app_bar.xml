@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- layout_app_bar.xml — Top app bar (file icon + name + path + undo/redo/more/export).
+     Inclut via <include> dans activity_editor.xml. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="@dimen/app_bar_height"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingStart="16dp"
+    android:paddingEnd="8dp"
+    android:background="@color/editor_surface"
+    android:elevation="2dp">
+
+    <!-- File icon -->
+    <FrameLayout
+        android:layout_width="30dp"
+        android:layout_height="30dp"
+        android:background="@drawable/file_icon_bg">
+        <ImageView
+            android:layout_width="17dp"
+            android:layout_height="17dp"
+            android:layout_gravity="center"
+            android:src="@drawable/ic_file"
+            android:tint="@color/editor_white"
+            android:scaleType="centerInside" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        android:layout_marginStart="10dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/file_name"
+            android:textColor="@color/editor_on_surface"
+            android:textSize="@dimen/text_normal"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/file_path"
+            android:textColor="@color/editor_on_surface_3"
+            android:textSize="@dimen/text_xsmall"
+            android:fontFamily="monospace" />
+    </LinearLayout>
+
+    <ImageButton
+        android:id="@+id/btnUndo"
+        android:layout_width="@dimen/app_bar_icon_size"
+        android:layout_height="@dimen/app_bar_icon_size"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@drawable/ic_undo"
+        android:tint="@color/editor_on_surface_2"
+        android:contentDescription="@string/action_undo" />
+
+    <ImageButton
+        android:id="@+id/btnRedo"
+        android:layout_width="@dimen/app_bar_icon_size"
+        android:layout_height="@dimen/app_bar_icon_size"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@drawable/ic_redo"
+        android:tint="@color/editor_on_surface_2"
+        android:contentDescription="@string/action_redo" />
+
+    <ImageButton
+        android:id="@+id/btnMore"
+        android:layout_width="@dimen/app_bar_icon_size"
+        android:layout_height="@dimen/app_bar_icon_size"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@drawable/ic_more"
+        android:tint="@color/editor_on_surface_2"
+        android:contentDescription="@string/action_more" />
+
+    <ImageButton
+        android:id="@+id/btnExport"
+        android:layout_width="@dimen/app_bar_icon_size"
+        android:layout_height="@dimen/app_bar_icon_size"
+        android:background="@drawable/icon_btn_accent_bg"
+        android:src="@drawable/ic_play"
+        android:tint="@color/editor_primary_light"
+        android:contentDescription="@string/action_export" />
+</LinearLayout>

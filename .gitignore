@@ -1,0 +1,23 @@
+# Fichiers de build
+.gradle/
+build/
+local.properties
+*.iml
+.idea/
+.DS_Store
+
+# APK / AAR
+*.apk
+*.aab
+*.aar
+
+# Logs
+*.log
+captures/
+
+# IDE
+.vscode/
+*.swp
+
+# IDE (AndroidIDE)
+.acside/

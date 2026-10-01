@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- item_palette_card.xml — Grid item for the Palette panel. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="0dp"
+    android:layout_height="wrap_content"
+    android:layout_weight="1"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:paddingTop="14dp"
+    android:paddingBottom="14dp"
+    android:paddingStart="6dp"
+    android:paddingEnd="6dp"
+    android:background="@drawable/palette_card_bg"
+    android:clickable="true"
+    android:focusable="true"
+    android:foreground="?attr/selectableItemBackground">
+
+    <FrameLayout
+        android:layout_width="@dimen/pal_icon_size"
+        android:layout_height="@dimen/pal_icon_size"
+        android:background="@drawable/pal_icon_bg">
+
+        <ImageView
+            android:id="@+id/palIcon"
+            android:layout_width="17dp"
+            android:layout_height="17dp"
+            android:layout_gravity="center"
+            android:scaleType="centerInside"
+            android:tint="@color/editor_primary_light" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/palName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="7dp"
+        android:textColor="@color/editor_on_surface_2"
+        android:textSize="10.5sp"
+        android:textStyle="bold" />
+</LinearLayout>

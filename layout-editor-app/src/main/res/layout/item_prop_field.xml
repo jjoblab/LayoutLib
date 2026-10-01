@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- item_prop_field.xml — Un champ de propriété (label + input).
+     Utilisé pour les 3 types : texte, couleur (avec swatch), select (avec chevron).
+     Le type est configuré programmatiquement par PropertiesPanel. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/propFieldRoot"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <!-- Label (10sp, bold, uppercase, on-surface-3) -->
+    <TextView
+        android:id="@+id/propLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:paddingStart="2dp"
+        android:paddingEnd="2dp"
+        android:textColor="@color/editor_on_surface_3"
+        android:textSize="10sp"
+        android:textStyle="bold" />
+
+    <!-- Input container (FrameLayout pour positionner le swatch/chevron par-dessus l'EditText) -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/prop_input_height"
+        android:layout_marginTop="4dp">
+
+        <!-- Champ texte (monospace 11.5sp, bg surface-2, border outline-3, corner 9dp) -->
+        <EditText
+            android:id="@+id/propInput"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/prop_input_bg"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:textColor="@color/editor_on_surface"
+            android:textColorHint="@color/editor_on_surface_3"
+            android:textSize="11.5sp"
+            android:fontFamily="monospace"
+            android:singleLine="true"
+            android:inputType="text"
+            android:imeOptions="flagNoExtractUi"
+            android:gravity="center_vertical" />
+
+        <!-- Swatch couleur (22x22, corner 6dp, positionné à gauche) -->
+        <View
+            android:id="@+id/propSwatch"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_gravity="start|center_vertical"
+            android:layout_marginStart="7dp"
+            android:visibility="gone" />
+
+        <!-- Chevron pour les selects (positionné à droite, rotation 90° = pointe vers le bas) -->
+        <ImageView
+            android:id="@+id/propChevron"
+            android:layout_width="12dp"
+            android:layout_height="12dp"
+            android:layout_gravity="end|center_vertical"
+            android:layout_marginEnd="9dp"
+            android:src="@drawable/ic_chevron_right"
+            android:tint="@color/editor_on_surface_3"
+            android:rotation="90"
+            android:visibility="gone" />
+    </FrameLayout>
+</LinearLayout>

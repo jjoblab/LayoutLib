@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- activity_crash.xml — Écran de crash avec stack trace.
+     Thème dark Material 3 (cohérent avec l'éditeur). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/editor_bg"
+    android:fitsSystemWindows="true">
+
+    <!-- Top bar (rouge error) -->
+    <com.google.android.material.appbar.MaterialToolbar
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/editor_error"
+        app:title="Crash détecté"
+        app:titleTextColor="@color/editor_white"
+        app:navigationIcon="@null" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- Titre -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="L'application a crashé"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                android:textColor="@color/editor_error"
+                android:layout_marginBottom="12dp" />
+
+            <!-- Description -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="L'application a rencontré une erreur inattendue. Voici les détails pour diagnostiquer le problème :"
+                android:textSize="14sp"
+                android:textColor="@color/editor_on_surface_2"
+                android:layout_marginBottom="16dp" />
+
+            <!-- Exception class -->
+            <TextView
+                android:id="@+id/exceptionClass"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:textColor="@color/editor_on_surface"
+                android:fontFamily="monospace"
+                android:background="@color/editor_surface"
+                android:padding="12dp"
+                android:layout_marginBottom="8dp" />
+
+            <!-- Exception message -->
+            <TextView
+                android:id="@+id/exceptionMessage"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="13sp"
+                android:textColor="@color/editor_on_surface"
+                android:fontFamily="monospace"
+                android:background="@color/editor_surface"
+                android:padding="12dp"
+                android:layout_marginBottom="16dp" />
+
+            <!-- Stack trace label -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Stack trace"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:textColor="@color/editor_on_surface_3"
+                android:layout_marginBottom="8dp" />
+
+            <!-- Stack trace (scrollable) -->
+            <TextView
+                android:id="@+id/stackTraceText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="11sp"
+                android:textColor="@color/editor_code_text"
+                android:fontFamily="monospace"
+                android:background="@color/editor_code_bg"
+                android:padding="12dp"
+                android:minHeight="200dp"
+                android:maxHeight="400dp"
+                android:scrollbars="vertical"
+                android:textIsSelectable="true" />
+
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- Bottom action bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="12dp"
+        android:background="@color/editor_surface"
+        android:gravity="end">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnShare"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Partager"
+            android:textColor="@color/editor_on_surface_2"
+            android:layout_marginEnd="8dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnCopy"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Copier"
+            android:textColor="@color/editor_primary_light"
+            android:layout_marginEnd="8dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnRestart"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Redémarrer"
+            app:backgroundTint="@color/editor_primary_bright"
+            app:tint="@color/editor_white" />
+    </LinearLayout>
+</LinearLayout>

@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- layout_canvas_area.xml — Canvas area (CoordinatorLayout).
+     Contient : design view, blueprint view, code view, zoom controls, FAB,
+     ET le bottom sheet (inclus via <include>).
+     Le bottom sheet vit dans le canvas area : il s'étire du grabber
+     jusqu'au bas du canvas, au-dessus de la BottomNavigationView.
+     CoordinatorLayout pour supporter BottomSheetBehavior.
+     layout_height="0dp" + layout_weight="1" : remplit l'espace restant
+     dans le LinearLayout parent (activity_editor.xml). -->
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/canvasArea"
+    android:layout_width="match_parent"
+    android:layout_height="0dp"
+    android:layout_weight="1"
+    android:background="@drawable/canvas_area_bg">
+
+    <!-- Canvas grid (16x16dp, blanc 2.5% opacity) — derrière le device frame -->
+    <jo.layoutlib.inflater.CanvasGridView
+        android:id="@+id/canvasGrid"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clickable="false"
+        android:focusable="false" />
+
+    <!-- ============================================================
+         DESIGN VIEW — root et overlay ajoutés directement comme enfants
+         de designScroll (plus de previewContainer intermédiaire).
+         Le padding est sur designScroll pour laisser de l'espace autour
+         du rendu. Les deux vues (root + overlay) ont gravity=center
+         et se superposent (FrameLayout = z-stack).
+         ============================================================ -->
+    <FrameLayout
+        android:id="@+id/designScroll"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/transparent"
+        android:paddingTop="@dimen/canvas_padding_top"
+        android:paddingBottom="@dimen/canvas_padding_bottom"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp" />
+
+    <!-- ============================================================
+         BLUEPRINT VIEW — scrollable list of bp-boxes
+         ============================================================ -->
+    <ScrollView
+        android:id="@+id/blueprintScroll"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:scrollbars="none"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center_horizontal"
+            android:paddingTop="@dimen/canvas_padding_top"
+            android:paddingBottom="@dimen/canvas_padding_bottom"
+            android:paddingStart="24dp"
+            android:paddingEnd="24dp">
+
+            <jo.layoutlib.inflater.BlueprintListView
+                android:id="@+id/blueprintList"
+                android:layout_width="@dimen/device_canvas_width"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- ============================================================
+         CODE VIEW — XML editor (EditorView from code-editor-lib)
+         ============================================================ -->
+    <FrameLayout
+        android:id="@+id/codeViewContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/editor_code_bg"
+        android:visibility="gone">
+
+        <!-- Code tab bar -->
+        <LinearLayout
+            android:id="@+id/codeTabBar"
+            android:layout_width="match_parent"
+            android:layout_height="34dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:background="#08FFFFFF">
+
+            <TextView
+                android:id="@+id/codeTab1"
+                android:layout_width="wrap_content"
+                android:layout_height="26dp"
+                android:gravity="center"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:text="@string/code_tab_xml"
+                android:textColor="@color/editor_primary_light"
+                android:textSize="@dimen/text_small"
+                android:fontFamily="monospace"
+                android:background="@drawable/code_tab_active_bg" />
+
+            <TextView
+                android:id="@+id/codeTab2"
+                android:layout_width="wrap_content"
+                android:layout_height="26dp"
+                android:gravity="center"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:layout_marginStart="4dp"
+                android:text="@string/code_tab_styles"
+                android:textColor="@color/editor_on_surface_3"
+                android:textSize="@dimen/text_small"
+                android:fontFamily="monospace" />
+
+            <TextView
+                android:id="@+id/codeTab3"
+                android:layout_width="wrap_content"
+                android:layout_height="26dp"
+                android:gravity="center"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:layout_marginStart="4dp"
+                android:text="@string/code_tab_colors"
+                android:textColor="@color/editor_on_surface_3"
+                android:textSize="@dimen/text_small"
+                android:fontFamily="monospace" />
+        </LinearLayout>
+
+        <jo.codeeditor.view.EditorView
+            android:id="@+id/editorView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginTop="34dp"
+            android:background="@color/editor_code_bg"
+            android:focusable="true"
+            android:focusableInTouchMode="true" />
+    </FrameLayout>
+
+    <!-- ============================================================
+         OVERLAYS : screen badge, status text, zoom controls, FAB
+         ============================================================ -->
+
+    <!-- Screen info badge (top-center) -->
+    <TextView
+        android:id="@+id/screenBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="14dp"
+        android:background="@drawable/screen_badge_bg"
+        android:paddingStart="@dimen/screen_badge_pad_h"
+        android:paddingEnd="@dimen/screen_badge_pad_h"
+        android:paddingTop="@dimen/screen_badge_pad_v"
+        android:paddingBottom="@dimen/screen_badge_pad_v"
+        android:text="@string/screen_badge_default"
+        android:textColor="@color/editor_on_surface_2"
+        android:textSize="@dimen/text_xsmall"
+        android:fontFamily="monospace"
+        android:elevation="6dp" />
+
+    <!-- Status text (bottom-left) -->
+    <TextView
+        android:id="@+id/statusText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginStart="12dp"
+        android:layout_marginBottom="12dp"
+        android:background="@color/editor_surface"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:text="@string/status_ready"
+        android:textColor="@color/editor_on_surface_2"
+        android:textSize="@dimen/text_small"
+        android:fontFamily="monospace"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:elevation="4dp" />
+
+    <!-- Zoom controls (right side, vertical) -->
+    <LinearLayout
+        android:id="@+id/zoomControls"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="end|center_vertical"
+        android:layout_marginEnd="14dp"
+        android:orientation="vertical"
+        android:background="@drawable/zoom_controls_bg"
+        android:padding="6dp"
+        android:elevation="8dp">
+
+        <ImageButton
+            android:id="@+id/btnZoomIn"
+            android:layout_width="@dimen/zoom_btn_size"
+            android:layout_height="@dimen/zoom_btn_size"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_zoom_in"
+            android:tint="@color/editor_on_surface_2"
+            android:scaleType="centerInside" />
+
+        <TextView
+            android:id="@+id/zoomPercent"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
+            android:text="100%"
+            android:textColor="@color/editor_on_surface_2"
+            android:textSize="@dimen/text_xsmall"
+            android:fontFamily="monospace" />
+
+        <ImageButton
+            android:id="@+id/btnZoomOut"
+            android:layout_width="@dimen/zoom_btn_size"
+            android:layout_height="@dimen/zoom_btn_size"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_zoom_out"
+            android:tint="@color/editor_on_surface_2"
+            android:scaleType="centerInside" />
+
+        <ImageButton
+            android:id="@+id/btnZoomFit"
+            android:layout_width="@dimen/zoom_btn_size"
+            android:layout_height="@dimen/zoom_btn_size"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_zoom_fit"
+            android:tint="@color/editor_on_surface_2"
+            android:scaleType="centerInside" />
+    </LinearLayout>
+
+    <!-- FAB -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="16dp"
+        android:layout_marginBottom="100dp"
+        android:src="@drawable/ic_plus"
+        app:backgroundTint="@color/editor_primary_bright"
+        app:tint="@color/editor_white"
+        app:fabCustomSize="@dimen/fab_size"
+        app:maxImageSize="26dp"
+        app:shapeAppearanceOverlay="@style/FabSquared" />
+
+    <!-- ============================================================
+         BOTTOM SHEET — inclus dans le canvas area.
+         TEMPORAIREMENT CACHÉ pendant le debug des overlays
+         (visibility=gone géré programmatiquement dans MainActivity).
+         ============================================================ -->
+    <include layout="@layout/layout_bottom_sheet" />
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

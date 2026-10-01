@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- canvas_area_bg.xml : Background du canvas area.
+     Simule le .canvas-area du HTML preview :
+     radial-gradient(circle at 50% 30%, rgba(124,92,255,.06), transparent 60%)
+     sur fond bg-screen. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Base : bg-screen (#1A1A2E) -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/editor_bg_screen" />
+        </shape>
+    </item>
+    <!-- Radial gradient : rgba(124,92,255,.06) au centre-top, transparent -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:type="radial"
+                android:gradientRadius="400dp"
+                android:centerX="0.5"
+                android:centerY="0.3"
+                android:startColor="#0F7C5CFF"
+                android:endColor="#001A1A2E" />
+        </shape>
+    </item>
+</layer-list>

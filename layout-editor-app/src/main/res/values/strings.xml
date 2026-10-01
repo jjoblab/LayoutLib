@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Layout Editor</string>
+
+    <!-- Top app bar -->
+    <string name="file_name">activity_login.xml</string>
+    <string name="file_path">res/layout/</string>
+    <string name="action_undo">Annuler</string>
+    <string name="action_redo">Rétablir</string>
+    <string name="action_more">Plus</string>
+    <string name="action_export">Exporter / Lancer</string>
+    <string name="action_filter">Filtrer</string>
+
+    <!-- Mode tabs -->
+    <string name="mode_design">Design</string>
+    <string name="mode_blueprint">Blueprint</string>
+    <string name="mode_code">Code</string>
+
+    <!-- Bottom sheet -->
+    <string name="bs_title_properties">Properties</string>
+    <string name="bs_title_palette">Palette</string>
+    <string name="bs_title_hierarchy">Hierarchy</string>
+    <string name="bs_tab_attributes">Attributes</string>
+    <string name="bs_tab_palette">Palette</string>
+    <string name="bs_tab_tree">Tree</string>
+
+    <!-- Bottom nav -->
+    <string name="bn_design">Design</string>
+    <string name="bn_palette">Palette</string>
+    <string name="bn_properties">Properties</string>
+    <string name="bn_tree">Tree</string>
+
+    <!-- Property sections -->
+    <string name="prop_section_identity">Identity</string>
+    <string name="prop_section_text">Text</string>
+    <string name="prop_section_layout">Layout</string>
+    <string name="prop_section_input">Input</string>
+    <string name="prop_section_style">Style</string>
+
+    <!-- Screen badge -->
+    <string name="screen_badge_default">412 × 915 dp · xxhdpi</string>
+
+    <!-- Status -->
+    <string name="status_ready">Prêt</string>
+    <string name="status_xml_invalid">XML en cours de frappe…</string>
+
+    <!-- Palette -->
+    <string name="palette_quick_add">Quick add</string>
+    <string name="palette_components">Composants</string>
+
+    <!-- Empty states -->
+    <string name="empty_no_selection">Aucune vue sélectionnée</string>
+    <string name="empty_no_hierarchy">Aucune hiérarchie</string>
+
+    <!-- Code editor -->
+    <string name="code_hint">Entrez votre XML ici…</string>
+    <string name="code_tab_xml">activity_login.xml</string>
+    <string name="code_tab_styles">styles.xml</string>
+    <string name="code_tab_colors">colors.xml</string>
+
+    <!-- Toast -->
+    <string name="toast_xml_copied">XML copié dans le presse-papiers</string>
+    <string name="toast_added_component">Composant ajouté : %1$s</string>
+    <string name="toast_export_done">Exporté : %1$d vues · %2$d ms</string>
+</resources>

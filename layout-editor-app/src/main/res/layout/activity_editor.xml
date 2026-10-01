@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- activity_editor.xml — Layout Editor main screen (v4 avec includes).
+     Structure :
+     CoordinatorLayout (root)
+       └── LinearLayout (main content, marginBottom = bottom nav height)
+             ├── <include layout="layout_app_bar"/>      — top app bar
+             ├── <include layout="layout_mode_tabs"/>     — Design/Blueprint/Code tabs
+             └── <include layout="layout_canvas_area"/>   — CoordinatorLayout contenant
+                   ├── design view (ScrollView + previewContainer)
+                   ├── blueprint view (ScrollView + BlueprintListView)
+                   ├── code view (EditorView)
+                   ├── zoom controls + FAB + screen badge + status
+                   └── <include layout="layout_bottom_sheet"/>  ← DANS le canvas
+       └── BottomNavigationView (insetEdge=bottom) -->
+<androidx.coordinatorlayout.widget.CoordinatorLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/editor_bg"
+    android:fitsSystemWindows="true">
+
+    <!-- Main content : app bar + mode tabs + canvas.
+         Bottom margin = bottom nav height so canvas isn't hidden behind nav. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:layout_marginBottom="@dimen/bottom_nav_height">
+
+        <!-- Top app bar (file icon + name + undo/redo/more/export) -->
+        <include layout="@layout/layout_app_bar" />
+
+        <!-- Mode tabs (Design / Blueprint / Code) -->
+        <include layout="@layout/layout_mode_tabs" />
+
+        <!-- Canvas area (CoordinatorLayout) : design/blueprint/code views
+             + zoom + FAB + bottom sheet inclus dedans -->
+        <include layout="@layout/layout_canvas_area" />
+
+    </LinearLayout>
+    <!-- /Main content -->
+
+    <!-- ============================================================
+         BOTTOM NAVIGATION — Vrai BottomNavigationView (Material 3)
+         layout_insetEdge="bottom" : la main content LinearLayout a
+         marginBottom = bottom_nav_height pour ne pas être cachée.
+         ============================================================ -->
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottomNav"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        app:menu="@menu/bottom_nav_menu"
+        app:labelVisibilityMode="labeled"
+        app:itemIconTint="@color/bottom_nav_item_color"
+        app:itemTextColor="@color/bottom_nav_item_color"
+        app:itemActiveIndicatorStyle="@style/Widget.LayoutEditor.BottomNavigationView.ActiveIndicator"
+        app:layout_insetEdge="bottom"
+        android:background="@color/editor_surface"
+        app:elevation="0dp" />
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

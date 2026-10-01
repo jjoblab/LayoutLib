@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- layout_bottom_sheet.xml — Bottom sheet (Attributes / Palette / Tree).
+     Ce layout est inclus DANS le canvas area (layout_canvas_area.xml).
+     Le parent doit être un CoordinatorLayout pour que BottomSheetBehavior fonctionne.
+     Le sheet vit entièrement dans le canvas area : il s'étire du grabber
+     jusqu'au bas du canvas, au-dessus de la BottomNavigationView. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/bottomSheet"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/bottom_sheet_bg"
+    android:elevation="10dp"
+    app:layout_behavior="com.google.android.material.bottomsheet.BottomSheetBehavior"
+    app:behavior_hideable="false"
+    app:behavior_fitToContents="true"
+    app:behavior_halfExpandedRatio="0.5"
+    app:behavior_peekHeight="140dp"
+    app:behavior_skipCollapsed="false">
+
+    <!-- Grabber (drag handle) -->
+    <View
+        android:id="@+id/bsGrabber"
+        android:layout_width="@dimen/bs_grabber_width"
+        android:layout_height="@dimen/bs_grabber_height"
+        android:layout_gravity="center"
+        android:layout_marginTop="9dp"
+        android:layout_marginBottom="4dp"
+        android:background="@drawable/bs_grabber_bg" />
+
+    <!-- Header (title + id + filter button) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="10dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:id="@+id/bsTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/bs_title_properties"
+                android:textColor="@color/editor_on_surface"
+                android:textSize="@dimen/text_medium_13"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/bsIdChip"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bs_id_bg"
+                android:paddingStart="7dp"
+                android:paddingEnd="7dp"
+                android:paddingTop="3dp"
+                android:paddingBottom="3dp"
+                android:text="@+id/emailInput"
+                android:textColor="@color/editor_primary_light"
+                android:textSize="@dimen/text_xsmall"
+                android:fontFamily="monospace"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/btnFilter"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_filter"
+            android:tint="@color/editor_on_surface_2"
+            android:contentDescription="@string/action_filter" />
+    </LinearLayout>
+
+    <!-- BS tabs -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="8dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/bsTabAttributes"
+            style="@style/Widget.LayoutEditor.BottomSheetTab"
+            android:layout_width="wrap_content"
+            android:text="@string/bs_tab_attributes" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/bsTabPalette"
+            style="@style/Widget.LayoutEditor.BottomSheetTab"
+            android:layout_width="wrap_content"
+            android:layout_marginStart="4dp"
+            android:text="@string/bs_tab_palette" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/bsTabTree"
+            style="@style/Widget.LayoutEditor.BottomSheetTab"
+            android:layout_width="wrap_content"
+            android:layout_marginStart="4dp"
+            android:text="@string/bs_tab_tree" />
+    </LinearLayout>
+
+    <!-- BS body : container dynamique qui swap entre les 3 panels.
+         NestedScrollView pour que le scroll interne commute avec le drag du BottomSheetBehavior. -->
+    <androidx.core.widget.NestedScrollView
+        android:id="@+id/bsBodyScroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fillViewport="true"
+        android:scrollbars="vertical"
+        android:overScrollMode="never">
+
+        <FrameLayout
+            android:id="@+id/bsContentFrame"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:paddingTop="12dp"
+            android:paddingBottom="18dp" />
+    </androidx.core.widget.NestedScrollView>
+</LinearLayout>

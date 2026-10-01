@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Backgrounds -->
+    <color name="editor_bg">#FF07070F</color>
+    <color name="editor_bg_workspace">#FF07070F</color>
+    <color name="editor_bg_screen">#FF1A1A2E</color>
+    <color name="editor_surface">#FF211F35</color>
+    <color name="editor_surface_2">#FF28263F</color>
+    <color name="editor_surface_3">#FF323052</color>
+    <color name="editor_elevated">#FF2D2B48</color>
+    <color name="editor_glass">#B3211F35</color>
+    <color name="editor_device_canvas_bg">#FF15152A</color>
+
+    <!-- Primary / brand -->
+    <color name="editor_primary">#FF6750A4</color>
+    <color name="editor_primary_bright">#FF7C5CFF</color>
+    <color name="editor_primary_light">#FFD0BCFF</color>
+    <color name="editor_primary_container">#FF4F378B</color>
+    <color name="editor_primary_container_2">#FF5A4496</color>
+    <color name="editor_on_primary">#FFFFFFFF</color>
+    <color name="editor_on_primary_container">#FFEADDFF</color>
+
+    <!-- Text -->
+    <color name="editor_on_surface">#FFE7E1EC</color>
+    <color name="editor_on_surface_2">#FFC9C3D6</color>
+    <color name="editor_on_surface_3">#FF9B95AD</color>
+
+    <!-- Outlines -->
+    <color name="editor_outline">#FF4A4860</color>
+    <color name="editor_outline_2">#FF322F47</color>
+    <color name="editor_outline_3">#FF252338</color>
+
+    <!-- Blueprint -->
+    <color name="editor_blueprint">#FF4AA3FF</color>
+    <color name="editor_blueprint_id_text">#994AA3FF</color>
+    <color name="editor_blueprint_bg">#0F4AA3FF</color>
+    <color name="editor_blueprint_bg_selected">#147C5CFF</color>
+
+    <!-- Status -->
+    <color name="editor_success">#FF6FDC8C</color>
+    <color name="editor_warning">#FFFFB74D</color>
+    <color name="editor_error">#FFF4757A</color>
+
+    <!-- Code -->
+    <color name="editor_code_bg">#FF0F1226</color>
+    <color name="editor_code_text">#FFE6E6F0</color>
+    <color name="editor_code_tag">#FFF07178</color>
+    <color name="editor_code_attr">#FFC792EA</color>
+    <color name="editor_code_string">#FFC3E88D</color>
+    <color name="editor_code_comment">#FF54668A</color>
+    <color name="editor_code_bracket">#FF89DDFF</color>
+    <color name="editor_code_number">#FFF78C6C</color>
+    <color name="editor_code_line_num">#FF3A3D5C</color>
+    <color name="editor_code_line_num_active">#FF9B95AD</color>
+    <color name="editor_code_highlight_bg">#147C5CFF</color>
+
+    <!-- Misc -->
+    <color name="editor_white">#FFFFFFFF</color>
+    <color name="editor_black">#FF000000</color>
+    <color name="editor_handle_stroke">#FF7C5CFF</color>
+    <color name="editor_tooltip_bg">#FF0A0A18</color>
+    <color name="editor_label_bg">#FF7C5CFF</color>
+    <color name="editor_label_text">#FFFFFFFF</color>
+
+    <!-- Aliases -->
+    <color name="primary">@color/editor_primary</color>
+    <color name="text_primary">@color/editor_on_surface</color>
+    <color name="text_secondary">@color/editor_on_surface_2</color>
+    <color name="text_hint">@color/editor_on_surface_3</color>
+    <color name="surface">@color/editor_surface</color>
+    <color name="background">@color/editor_bg</color>
+    <color name="white">@color/editor_white</color>
+    <color name="black">@color/editor_black</color>
+    <color name="canvas_bg">@color/editor_device_canvas_bg</color>
+    <color name="surface_variant">@color/editor_surface_2</color>
+    <color name="palette_item_bg">@color/editor_surface_2</color>
+    <color name="palette_item_border">@color/editor_outline_3</color>
+    <color name="primary_light">@color/editor_primary_light</color>
+</resources>

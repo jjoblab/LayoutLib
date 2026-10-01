@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- prop_swatch_bg.xml — Background pour le swatch couleur.
+     22x22, corner 6dp, border 1.5dp rgba(255,255,255,0.15).
+     La couleur de fond est définie programmatiquement. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#FFFFFFFF" />
+    <stroke android:width="1.5dp" android:color="#26FFFFFF" />
+    <corners android:radius="6dp" />
+</shape>

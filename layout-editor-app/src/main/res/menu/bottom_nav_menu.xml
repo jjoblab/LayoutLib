@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- menu/bottom_nav_menu.xml — Menu pour la BottomNavigationView.
+     4 items : Design / Palette / Properties / Tree. -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/nav_design"
+        android:icon="@drawable/ic_bn_design"
+        android:title="@string/bn_design" />
+    <item
+        android:id="@+id/nav_palette"
+        android:icon="@drawable/ic_bn_palette"
+        android:title="@string/bn_palette" />
+    <item
+        android:id="@+id/nav_properties"
+        android:icon="@drawable/ic_bn_properties"
+        android:title="@string/bn_properties" />
+    <item
+        android:id="@+id/nav_tree"
+        android:icon="@drawable/ic_bn_tree"
+        android:title="@string/bn_tree" />
+</menu>

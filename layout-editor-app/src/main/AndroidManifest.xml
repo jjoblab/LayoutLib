@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application
+        android:name=".EditorApplication"
+        android:allowBackup="true"
+        android:icon="@android:drawable/ic_menu_edit"
+        android:label="Layout Editor"
+        android:theme="@style/Theme.LayoutEditor"
+        android:supportsRtl="true">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".CrashActivity"
+            android:exported="false"
+            android:process=":crash"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.LayoutEditor.Crash" />
+    </application>
+</manifest>

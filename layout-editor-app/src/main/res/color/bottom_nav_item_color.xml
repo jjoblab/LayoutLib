@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- color/bottom_nav_item_color.xml — Selector pour les items de la BottomNavigationView.
+     Active = on-surface (clair), inactive = on-surface-3 (gris). -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_checked="true" android:color="@color/editor_on_surface" />
+    <item android:color="@color/editor_on_surface_3" />
+</selector>

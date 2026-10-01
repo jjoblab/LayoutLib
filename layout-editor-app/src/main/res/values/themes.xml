@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.LayoutEditor" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/editor_primary_bright</item>
+        <item name="colorOnPrimary">@color/editor_on_primary</item>
+        <item name="colorPrimaryContainer">@color/editor_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/editor_primary_light</item>
+        <item name="colorSecondary">@color/editor_primary_light</item>
+        <item name="colorOnSecondary">@color/editor_on_primary</item>
+        <item name="colorSurface">@color/editor_surface</item>
+        <item name="colorOnSurface">@color/editor_on_surface</item>
+        <item name="colorOutline">@color/editor_outline</item>
+        <item name="android:statusBarColor">@color/editor_bg</item>
+        <item name="android:navigationBarColor">@color/editor_bg</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">@color/editor_bg</item>
+    </style>
+
+    <!-- Thème pour CrashActivity (sans app bar native, status bar rouge) -->
+    <style name="Theme.LayoutEditor.Crash" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/editor_error</item>
+        <item name="colorOnPrimary">@color/editor_white</item>
+        <item name="colorSurface">@color/editor_surface</item>
+        <item name="colorOnSurface">@color/editor_on_surface</item>
+        <item name="android:statusBarColor">@color/editor_error</item>
+        <item name="android:navigationBarColor">@color/editor_surface</item>
+        <item name="android:windowBackground">@color/editor_bg</item>
+    </style>
+
+    <!-- Mode tab buttons -->
+    <style name="Widget.LayoutEditor.ModeTab" parent="Widget.Material3.Button.TextButton">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">@dimen/mode_tab_height</item>
+        <item name="android:textSize">@dimen/text_medium_13</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/editor_on_surface_3</item>
+        <item name="cornerRadius">@dimen/mode_tab_corner</item>
+        <item name="backgroundTint">@android:color/transparent</item>
+    </style>
+
+    <!-- Bottom sheet tab buttons -->
+    <style name="Widget.LayoutEditor.BottomSheetTab" parent="Widget.Material3.Button.TextButton">
+        <item name="android:layout_height">@dimen/bs_tab_height</item>
+        <item name="android:paddingStart">11dp</item>
+        <item name="android:paddingEnd">11dp</item>
+        <item name="android:textSize">@dimen/text_small_medium</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/editor_on_surface_3</item>
+        <item name="cornerRadius">@dimen/bs_tab_corner</item>
+        <item name="backgroundTint">@android:color/transparent</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+    </style>
+
+    <!-- Icon button (round) -->
+    <style name="Widget.LayoutEditor.IconButton" parent="Widget.Material3.Button.TextButton">
+        <item name="android:layout_width">@dimen/app_bar_icon_size</item>
+        <item name="android:layout_height">@dimen/app_bar_icon_size</item>
+        <item name="android:padding">0dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="cornerRadius">19dp</item>
+        <item name="iconTint">@color/editor_on_surface_2</item>
+        <item name="backgroundTint">@android:color/transparent</item>
+    </style>
+
+    <!-- Property input -->
+    <style name="Widget.LayoutEditor.PropInput" parent="android:Widget.EditText">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">@dimen/prop_input_height</item>
+        <item name="android:background">@drawable/prop_input_bg</item>
+        <item name="android:paddingStart">10dp</item>
+        <item name="android:paddingEnd">10dp</item>
+        <item name="android:textColor">@color/editor_on_surface</item>
+        <item name="android:textColorHint">@color/editor_on_surface_3</item>
+        <item name="android:textSize">@dimen/text_small_medium</item>
+        <item name="android:fontFamily">monospace</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:inputType">text</item>
+    </style>
+
+    <!-- Tree node row -->
+    <style name="Widget.LayoutEditor.TreeNode" parent="android:Widget">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:paddingStart">8dp</item>
+        <item name="android:paddingEnd">8dp</item>
+        <item name="android:paddingTop">7dp</item>
+        <item name="android:paddingBottom">7dp</item>
+        <item name="android:background">@drawable/tree_node_bg</item>
+    </style>
+
+    <!-- FAB squared shape -->
+    <style name="FabSquared" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">@dimen/fab_corner</item>
+    </style>
+
+    <!-- Palette popup animation style -->
+    <style name="PalettePopupAnimation" parent="android:Animation">
+        <item name="android:windowEnterAnimation">@anim/palette_popup_enter</item>
+        <item name="android:windowExitAnimation">@anim/palette_popup_exit</item>
+    </style>
+
+    <!-- BottomNavigationView style — Material 3 dark, active item with pill indicator -->
+    <style name="Widget.LayoutEditor.BottomNavigationView" parent="Widget.Material3.BottomNavigationView">
+        <item name="android:background">@color/editor_surface</item>
+        <item name="itemIconTint">@color/bottom_nav_item_color</item>
+        <item name="itemTextColor">@color/bottom_nav_item_color</item>
+        <item name="itemActiveIndicatorStyle">@style/Widget.LayoutEditor.BottomNavigationView.ActiveIndicator</item>
+        <item name="labelVisibilityMode">labeled</item>
+        <item name="elevation">0dp</item>
+    </style>
+
+    <!-- Active indicator : pill violet avec opacité -->
+    <style name="Widget.LayoutEditor.BottomNavigationView.ActiveIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
+        <item name="android:color">@color/editor_primary_container</item>
+        <item name="android:width">@dimen/bn_icon_wrap_w</item>
+        <item name="android:height">@dimen/bn_icon_wrap_h</item>
+    </style>
+</resources>
