@@ -10,6 +10,7 @@ import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
 
+import java.io.IOException;
 import java.io.StringReader;
 
 import jo.layoutlib.layout.LayoutEngineImpl;
@@ -27,8 +28,11 @@ import jo.layoutlib.resources.ResourceResolver;
  *   <li><strong>Validation XML préalable</strong> : si le XML est malformé
  *       (en cours de frappe), le rendu est annulé silencieusement et le
  *       dernier rendu valide est conservé — comme Android Studio</li>
- *   <li><strong>Annulation</strong> : si un nouveau rendu est demandé pendant
- *       qu'un est en cours, le précédent est annulé</li>
+ *   <li><strong>Rendu synchrone</strong> : {@code doRender()} s'exécute
+ *       intégralement sur le thread appelant (le thread principal) ; il n'y a
+ *       pas de rendu concurrent à annuler. Si une demande arrive pendant un
+ *       rendu (re-entrée défensive), elle est rejouée juste après via
+ *       {@code reRenderRequested}</li>
  *   <li><strong>Callback</strong> : notifie l'appelant avec le résultat
  *       (vue racine + métriques) ou l'erreur</li>
  * </ul>
@@ -43,6 +47,11 @@ import jo.layoutlib.resources.ResourceResolver;
  *   <li>Si valide mais erreur sémantique (tag inconnu) → callback d'erreur</li>
  *   <li>Si valide et succès → callback de succès</li>
  * </ol>
+ *
+ * <p>La validation s'appuie exclusivement sur {@link XmlPullParser} (pas
+ * d'heuristique sur le texte) : un attribut entre apostrophes contenant des
+ * guillemets, ou un commentaire avec un nombre impair de guillemets, restent
+ * du XML valide.</p>
  *
  * @author jo@Dev
  * @since 1.0
@@ -318,73 +327,63 @@ public class RenderService {
      *
      * <p>Cette méthode ne valide pas le schéma Android, uniquement la
      * conformité XML. Elle est utilisée pour filtrer les XML en cours
-     * de frappe (ex: "android:background=" en cours de saisie).</p>
+     * de frappe (ex: {@code android:background="} en cours de saisie).</p>
      *
-     * <p>Vérifications :</p>
-     * <ul>
-     *   <li>Le XML commence par {@code <}</li>
-     *   <li>Tous les tags ouverts sont fermés</li>
-     *   <li>Les attributs ont des valeurs entre guillemets</li>
-     *   <li>Pas de caractères illégaux</li>
-     * </ul>
+     * <p>La validation s'appuie <strong>exclusivement</strong> sur
+     * {@link XmlPullParser} — aucune heuristique sur le texte (comptage de
+     * guillemets, recherche de {@code =}…) qui rejetterait à tort du XML
+     * valide, comme {@code <TextView android:text='Dis "bonjour' />}</code>
+     * (guillemet dans une valeur entre apostrophes) ou un commentaire
+     * contenant un nombre impair de guillemets.</p>
+     *
+     * <p>Visibilité package : testable unitairement.</p>
      *
      * @param xml le XML à valider
      * @return true si le XML est bien formé
      */
-    private boolean isXmlWellFormed(String xml) {
-        if (xml == null || xml.trim().isEmpty()) {
+    static boolean isXmlWellFormed(String xml) {
+        if (xml == null) {
             return false;
         }
-
-        // Vérification rapide : doit commencer par <
         String trimmed = xml.trim();
-        if (!trimmed.startsWith("<")) {
+        if (trimmed.isEmpty()) {
             return false;
         }
-
-        // Vérification rapide : attribut sans valeur (ex: android:text= sans ")
-        // Détecte les patterns comme = sans guillemet suivant
-        if (trimmed.contains("=\"") == false && trimmed.contains("='") == false) {
-            // Pas d'attribut avec valeur — OK si c'est juste un tag simple
-            // Mais si on a un = sans guillemet, c'est invalide
-            if (trimmed.contains("=") && !trimmed.contains("=\"") && !trimmed.contains("='")) {
-                return false;
-            }
-        }
-
-        // Vérification : attribut incomplet (ex: android:text=" sans fermer le guillemet)
-        // Compte les guillemets non échappés
-        int doubleQuotes = 0;
-        boolean inString = false;
-        for (int i = 0; i < trimmed.length(); i++) {
-            char c = trimmed.charAt(i);
-            if (c == '"' && (i == 0 || trimmed.charAt(i - 1) != '\\')) {
-                doubleQuotes++;
-            }
-        }
-        if (doubleQuotes % 2 != 0) {
-            // Nombre impair de guillemets → attribut incomplet
-            return false;
-        }
-
-        // Validation complète avec XmlPullParser
         try {
-            XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
-            factory.setNamespaceAware(true);
-            XmlPullParser parser = factory.newPullParser();
+            XmlPullParser parser = obtainParserFactory().newPullParser();
             parser.setInput(new StringReader(trimmed));
-
             int event = parser.getEventType();
             while (event != XmlPullParser.END_DOCUMENT) {
                 event = parser.next();
             }
             return true;
-        } catch (XmlPullParserException e) {
+        } catch (XmlPullParserException | IOException e) {
             // XML malformé — en cours de frappe
             return false;
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
+            // kxml2 lève une RuntimeException (non contrôlée) pour certains
+            // XML invalides, ex. « Undefined Prefix » quand xmlns:android
+            // n'est pas encore déclaré. Un validateur ne doit jamais lever.
             return false;
         }
+    }
+
+    /**
+     * Factory {@link XmlPullParserFactory} mise en cache : la recréer à chaque
+     * rendu (comme à chaque frappe debouncée) est inutilement coûteux.
+     *
+     * <p>La factory est thread-safe pour la création de parseurs ; chaque
+     * parseur reste local à son appelant.</p>
+     */
+    private static XmlPullParserFactory parserFactory;
+
+    private static synchronized XmlPullParserFactory obtainParserFactory()
+            throws XmlPullParserException {
+        if (parserFactory == null) {
+            parserFactory = XmlPullParserFactory.newInstance();
+            parserFactory.setNamespaceAware(true);
+        }
+        return parserFactory;
     }
 
     /**
