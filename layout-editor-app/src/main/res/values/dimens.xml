@@ -5,7 +5,6 @@
     <dimen name="app_bar_icon_size">38dp</dimen>
 
     <!-- Mode tabs -->
-    <dimen name="mode_tabs_height">54dp</dimen>
     <dimen name="mode_tab_height">38dp</dimen>
     <dimen name="mode_tab_corner">20dp</dimen>
 
@@ -13,13 +12,8 @@
     <dimen name="canvas_padding_top">70dp</dimen>
     <dimen name="canvas_padding_bottom">90dp</dimen>
     <dimen name="device_canvas_width">320dp</dimen>
-    <dimen name="device_canvas_min_height">560dp</dimen>
-    <dimen name="device_canvas_corner">22dp</dimen>
-    <dimen name="device_canvas_padding_h">18dp</dimen>
-    <dimen name="device_canvas_padding_v">22dp</dimen>
 
     <!-- Screen badge -->
-    <dimen name="screen_badge_corner">999dp</dimen>
     <dimen name="screen_badge_pad_h">10dp</dimen>
     <dimen name="screen_badge_pad_v">4dp</dimen>
 
@@ -32,12 +26,9 @@
     <dimen name="fab_corner">18dp</dimen>
 
     <!-- Palette popup -->
-    <dimen name="palette_popup_width">264dp</dimen>
-    <dimen name="palette_popup_corner">18dp</dimen>
 
     <!-- Bottom sheet -->
     <dimen name="bottom_sheet_corner">22dp</dimen>
-    <dimen name="bottom_sheet_max_height">56%</dimen>
     <dimen name="bs_grabber_width">36dp</dimen>
     <dimen name="bs_grabber_height">4dp</dimen>
     <dimen name="bs_tab_height">28dp</dimen>
@@ -47,31 +38,20 @@
     <dimen name="bottom_nav_height">64dp</dimen>
     <dimen name="bn_icon_wrap_w">56dp</dimen>
     <dimen name="bn_icon_wrap_h">30dp</dimen>
-    <dimen name="bn_icon_wrap_corner">16dp</dimen>
 
     <!-- Property inputs -->
     <dimen name="prop_input_height">34dp</dimen>
-    <dimen name="prop_input_corner">9dp</dimen>
-    <dimen name="prop_swatch_size">22dp</dimen>
 
     <!-- Palette cards -->
     <dimen name="pal_card_corner">12dp</dimen>
     <dimen name="pal_icon_size">32dp</dimen>
-    <dimen name="pal_icon_corner">9dp</dimen>
 
     <!-- Tree -->
-    <dimen name="tree_node_corner">8dp</dimen>
-    <dimen name="tree_icon_size">20dp</dimen>
-    <dimen name="tree_icon_corner">5dp</dimen>
 
     <!-- Typography -->
-    <dimen name="text_xxsmall">9sp</dimen>
     <dimen name="text_xsmall">10sp</dimen>
     <dimen name="text_small">11sp</dimen>
     <dimen name="text_small_medium">11.5sp</dimen>
-    <dimen name="text_medium">12sp</dimen>
     <dimen name="text_medium_13">13sp</dimen>
     <dimen name="text_normal">14sp</dimen>
-    <dimen name="text_large">15sp</dimen>
-    <dimen name="text_xlarge">24sp</dimen>
 </resources>

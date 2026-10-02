@@ -15,6 +15,9 @@ import java.util.List;
  */
 public class FolderConfiguration {
 
+    /** Tag de journalisation. */
+    private static final String TAG = "FolderConfig";
+
     private DensityQualifier density;
     private LocaleQualifier locale;
     private ScreenSizeQualifier screenSize;
@@ -49,6 +52,8 @@ public class FolderConfiguration {
                     int api = Integer.parseInt(part.substring(1));
                     config.setVersion(new VersionQualifier(api));
                 } catch (NumberFormatException ignored) {
+                    // Voulu : segment de dossier non numérique (ex. -night) —
+                    // pas un niveau d'API, on ignore
                 }
             } else {
                 // Tenter densité

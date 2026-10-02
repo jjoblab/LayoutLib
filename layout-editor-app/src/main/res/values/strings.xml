@@ -31,11 +31,6 @@
     <string name="bn_tree">Tree</string>
 
     <!-- Property sections -->
-    <string name="prop_section_identity">Identity</string>
-    <string name="prop_section_text">Text</string>
-    <string name="prop_section_layout">Layout</string>
-    <string name="prop_section_input">Input</string>
-    <string name="prop_section_style">Style</string>
 
     <!-- Screen badge -->
     <string name="screen_badge_default">412 × 915 dp · xxhdpi</string>
@@ -45,7 +40,6 @@
     <string name="status_xml_invalid">XML en cours de frappe…</string>
 
     <!-- Palette -->
-    <string name="palette_quick_add">Quick add</string>
     <string name="palette_components">Composants</string>
 
     <!-- Empty states -->
@@ -53,7 +47,6 @@
     <string name="empty_no_hierarchy">Aucune hiérarchie</string>
 
     <!-- Code editor -->
-    <string name="code_hint">Entrez votre XML ici…</string>
     <string name="code_tab_xml">activity_login.xml</string>
     <string name="code_tab_styles">styles.xml</string>
     <string name="code_tab_colors">colors.xml</string>
@@ -62,4 +55,14 @@
     <string name="toast_xml_copied">XML copié dans le presse-papiers</string>
     <string name="toast_added_component">Composant ajouté : %1$s</string>
     <string name="toast_export_done">Exporté : %1$d vues · %2$d ms</string>
+    <string name="toast_opened">Ouvert : %1$s</string>
+    <string name="toast_saved">Enregistré : %1$s</string>
+    <string name="toast_open_failed">Impossible d\u2019ouvrir ce fichier</string>
+    <string name="toast_save_failed">Échec de l\u2019enregistrement</string>
+
+    <!-- Menu « Plus » (SAF) -->
+    <string name="menu_open">Ouvrir…</string>
+    <string name="menu_save">Enregistrer</string>
+    <string name="menu_save_as">Enregistrer sous…</string>
+    <string name="menu_copy_xml">Copier le XML</string>
 </resources>

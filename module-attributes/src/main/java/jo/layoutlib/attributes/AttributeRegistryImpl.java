@@ -1,5 +1,7 @@
 package jo.layoutlib.attributes;
 
+import android.util.Log;
+import jo.layoutlib.resources.api.AttributeFormat;
 import android.content.Context;
 import android.view.View;
 
@@ -24,6 +26,9 @@ import jo.layoutlib.resources.DimensionConverter;
  * @since 1.0
  */
 public class AttributeRegistryImpl implements AttributeRegistry {
+
+    /** Tag de journalisation. */
+    private static final String TAG = "AttrRegistry";
 
     private final Map<String, AttributeDefinitionImpl> attributes = new HashMap<>();
     private final Map<String, java.util.List<String>> styleables = new HashMap<>();
@@ -121,7 +126,7 @@ public class AttributeRegistryImpl implements AttributeRegistry {
                     if (enumName != null && enumValue != null) {
                         try {
                             attr.addEnumValue(enumName, Integer.parseInt(enumValue));
-                        } catch (NumberFormatException ignored) {}
+                        } catch (NumberFormatException e) { Log.w(TAG, "Valeur numérique invalide, ignorée : " + e.getMessage()); }
                     }
                 } else if ("flag".equals(childTag)) {
                     String flagName = parser.getAttributeValue(null, "name");
@@ -132,7 +137,7 @@ public class AttributeRegistryImpl implements AttributeRegistry {
                                     ? Integer.parseInt(flagValue.substring(2), 16)
                                     : Integer.parseInt(flagValue);
                             attr.addFlagValue(flagName, v);
-                        } catch (NumberFormatException ignored) {}
+                        } catch (NumberFormatException e) { Log.w(TAG, "Valeur numérique invalide, ignorée : " + e.getMessage()); }
                     }
                 }
                 depth++;

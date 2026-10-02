@@ -1,9 +1,9 @@
 package jo.layoutlib.attributes.format;
 
+import jo.layoutlib.resources.api.AttributeFormat;
 import java.util.HashMap;
 import java.util.Map;
 
-import jo.layoutlib.attributes.AttributeFormat;
 import jo.layoutlib.resources.DimensionConverter;
 
 /**

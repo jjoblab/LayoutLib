@@ -1,5 +1,6 @@
 package jo.layoutlib.layout;
 
+import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 
@@ -29,6 +30,9 @@ import java.util.Map;
  * @since 1.0
  */
 public class ConstraintSolver {
+
+    /** Tag de journalisation. */
+    private static final String TAG = "ConstraintSolver";
 
     private static final String NS_APP = "http://schemas.android.com/apk/res-auto";
     private static final String PARENT = "parent";
@@ -113,23 +117,23 @@ public class ConstraintSolver {
         info.rightToRightOf = getAppAttr(parser, "layout_constraintRight_toRightOf");
 
         String hBias = getAppAttr(parser, "layout_constraintHorizontal_bias");
-        if (hBias != null) { try { info.horizontalBias = Float.parseFloat(hBias); } catch (Exception e) {} }
+        if (hBias != null) { try { info.horizontalBias = Float.parseFloat(hBias); } catch (NumberFormatException e) { Log.w(TAG, "Valeur '" + hBias + "' invalide, ignorée : " + e.getMessage()); } }
         String vBias = getAppAttr(parser, "layout_constraintVertical_bias");
-        if (vBias != null) { try { info.verticalBias = Float.parseFloat(vBias); } catch (Exception e) {} }
+        if (vBias != null) { try { info.verticalBias = Float.parseFloat(vBias); } catch (NumberFormatException e) { Log.w(TAG, "Valeur '" + hBias + "' invalide, ignorée : " + e.getMessage()); } }
 
         String wPercent = getAppAttr(parser, "layout_constraintWidth_percent");
-        if (wPercent != null) { try { info.widthPercent = Float.parseFloat(wPercent); } catch (Exception e) {} }
+        if (wPercent != null) { try { info.widthPercent = Float.parseFloat(wPercent); } catch (NumberFormatException e) { Log.w(TAG, "Valeur '" + hBias + "' invalide, ignorée : " + e.getMessage()); } }
         String hPercent = getAppAttr(parser, "layout_constraintHeight_percent");
-        if (hPercent != null) { try { info.heightPercent = Float.parseFloat(hPercent); } catch (Exception e) {} }
+        if (hPercent != null) { try { info.heightPercent = Float.parseFloat(hPercent); } catch (NumberFormatException e) { Log.w(TAG, "Valeur '" + hBias + "' invalide, ignorée : " + e.getMessage()); } }
 
         // Marges
         String marginTop = getAppAttr(parser, "layout_constraintTop_margin");
         if (marginTop == null) marginTop = getAppAttr(parser, "layout_marginTop");
-        if (marginTop != null) { try { info.marginTop = Integer.parseInt(marginTop.replaceAll("[^0-9-]", "")); } catch (Exception e) {} }
+        if (marginTop != null) { try { info.marginTop = Integer.parseInt(marginTop.replaceAll("[^0-9-]", "")); } catch (NumberFormatException e) { Log.w(TAG, "marginTop='" + marginTop + "' invalide, ignoré"); } }
 
         String marginBottom = getAppAttr(parser, "layout_constraintBottom_margin");
         if (marginBottom == null) marginBottom = getAppAttr(parser, "layout_marginBottom");
-        if (marginBottom != null) { try { info.marginBottom = Integer.parseInt(marginBottom.replaceAll("[^0-9-]", "")); } catch (Exception e) {} }
+        if (marginBottom != null) { try { info.marginBottom = Integer.parseInt(marginBottom.replaceAll("[^0-9-]", "")); } catch (NumberFormatException e) { Log.w(TAG, "marginBottom='" + marginBottom + "' invalide, ignoré"); } }
 
         return info;
     }

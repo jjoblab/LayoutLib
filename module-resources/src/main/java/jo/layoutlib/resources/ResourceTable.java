@@ -1,6 +1,7 @@
 package jo.layoutlib.resources;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -47,6 +48,10 @@ public class ResourceTable {
 
     /** Table des booléens, indexée par nom puis qualifier. */
     private final Map<String, Map<ResourceQualifier, Boolean>> boolTable = new HashMap<>();
+
+    /** Table des string-arrays, indexée par nom puis qualifier. */
+    private final Map<String, Map<ResourceQualifier, List<String>>> stringArrayTable =
+            new HashMap<>();
 
     /**
      * Ajoute une couleur dans la table.
@@ -104,6 +109,19 @@ public class ResourceTable {
     }
 
     /**
+     * Ajoute un string-array ({@code <string-array>}) dans la table.
+     *
+     * @param name      nom de l'array (référencé par {@code @array/name})
+     * @param values    les éléments de l'array
+     * @param qualifier qualifier du dossier source
+     */
+    public void putStringArray(String name, List<String> values,
+                               ResourceQualifier qualifier) {
+        stringArrayTable.computeIfAbsent(name, k -> new HashMap<>())
+                .put(qualifier, values != null ? values : java.util.Collections.emptyList());
+    }
+
+    /**
      * Récupère une couleur pour le qualifier cible.
      *
      * @param name   nom de la couleur
@@ -156,6 +174,35 @@ public class ResourceTable {
      */
     public Boolean getBoolean(String name, ResourceQualifier target) {
         return resolveBest(boolTable.get(name), target);
+    }
+
+    /**
+     * Récupère un string-array pour le qualifier cible.
+     *
+     * @param name   nom de l'array
+     * @param target qualifier cible
+     * @return une copie de la liste des éléments, ou {@code null} si absente
+     */
+    public List<String> getStringArray(String name, ResourceQualifier target) {
+        List<String> values = resolveBest(stringArrayTable.get(name), target);
+        return values != null ? new java.util.ArrayList<>(values) : null;
+    }
+
+    /**
+     * Indique si un string-array existe dans la table.
+     *
+     * @param name nom de l'array
+     * @return {@code true} si l'array existe
+     */
+    public boolean hasStringArray(String name) {
+        return stringArrayTable.containsKey(name);
+    }
+
+    /**
+     * @return le nombre total de string-arrays stockés
+     */
+    public int stringArrayCount() {
+        return stringArrayTable.size();
     }
 
     /**
@@ -261,5 +308,6 @@ public class ResourceTable {
         dimenTable.clear();
         integerTable.clear();
         boolTable.clear();
+        stringArrayTable.clear();
     }
 }

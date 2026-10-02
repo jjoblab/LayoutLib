@@ -5,6 +5,7 @@ import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.StateListDrawable;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -12,7 +13,9 @@ import org.xmlpull.v1.XmlPullParserFactory;
 
 import java.io.IOException;
 import java.io.StringReader;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import jo.layoutlib.resources.ColorParser;
@@ -49,6 +52,9 @@ import jo.layoutlib.resources.ResourceResolver;
  * @since 1.0
  */
 public class DrawableResolverImpl implements DrawableResolver {
+
+    /** Tag de journalisation. */
+    private static final String TAG = "DrawableResolver";
 
     /** Cache des drawables parsés, indexé par XML source. */
     private final Map<String, Drawable> drawableCache = new HashMap<>();
@@ -112,6 +118,8 @@ public class DrawableResolverImpl implements DrawableResolver {
                 drawableCache.put(reference, drawable);
                 return drawable;
             } catch (ResourceException ignored) {
+                // Voulu : couleur nommée inconnue — le fallback natif prend
+                // le relais (resolve() continue)
             }
         }
 
@@ -132,6 +140,15 @@ public class DrawableResolverImpl implements DrawableResolver {
                 // Fichier image — retourner un BitmapDrawable
                 return loadBitmapDrawable(path, context);
             }
+        } else if (reference.startsWith("@color/")) {
+            // Couleur du projet — ColorDrawable
+            if (resourceResolver != null) {
+                Integer color = resourceResolver.getColor(reference);
+                if (color != null) {
+                    return new ColorDrawable(color);
+                }
+            }
+            return null;
         } else if (reference.startsWith("<")) {
             // C'est déjà un XML inline
             xml = reference;
@@ -139,6 +156,8 @@ public class DrawableResolverImpl implements DrawableResolver {
             try {
                 return new ColorDrawable(ColorParser.parse(reference));
             } catch (ResourceException ignored) {
+                // Voulu : couleur nommée inconnue — le fallback natif prend
+                // le relais (resolve() continue)
             }
         }
 
@@ -341,31 +360,126 @@ public class DrawableResolverImpl implements DrawableResolver {
     /**
      * Crée un StateListDrawable à partir d'un XML de selector.
      *
-     * <p>Note : la création des drawables enfants nécessite un
-     * {@link ResourceResolver} configuré. Sans resolver, seule la config
-     * est retournée (via {@link #parseConfig(String)}).</p>
+     * <p>Chaque {@code <item>} est résolu : les références {@code @color/}
+     * donnent un {@link ColorDrawable}, les références {@code @drawable/}
+     * sont résolues récursivement (shapes, selectors imbriqués…), et les
+     * couleurs littérales ({@code #RRGGBB}) donnent également un
+     * {@link ColorDrawable}. Un item non résolvable est ignoré — jamais
+     * d'exception qui casserait le rendu entier.</p>
      */
     private Drawable createSelectorDrawable(String xml, Context context) {
-        // La création d'un StateListDrawable avec drawables enfants nécessite
-        // la résolution de @drawable/foo. Cette implémentation retourne null
-        // pour l'instant — l'API parseConfig peut être utilisée pour inspecter.
-        if (resourceResolver == null) {
+        SelectorConfig config = selectorParser.parse(xml);
+        if (config == null || config.getItemCount() == 0) {
             return null;
         }
-        // TODO: implémenter la création de StateListDrawable avec résolution
-        // des drawables enfants via resourceResolver.getDrawablePath()
-        return null;
+        StateListDrawable stateList = new StateListDrawable();
+        int added = 0;
+        for (SelectorConfig.SelectorItem item : config.getItems()) {
+            Drawable child = resolveChildDrawable(item.getDrawableRef(), context);
+            if (child == null) {
+                continue;
+            }
+            stateList.addState(toStateSet(item), child);
+            added++;
+        }
+        return added > 0 ? stateList : null;
+    }
+
+    /**
+     * Résout le drawable d'un item de selector : {@code @drawable/},
+     * {@code @color/} ou couleur littérale.
+     *
+     * @param ref     la référence de l'item (peut être {@code null})
+     * @param context le contexte Android
+     * @return le drawable, ou {@code null} si non résolvable
+     */
+    private Drawable resolveChildDrawable(String ref, Context context) {
+        if (ref == null || ref.isEmpty()) {
+            return null;
+        }
+        if (ref.startsWith("@color/") || ref.startsWith("#")) {
+            Integer color = null;
+            if (ref.startsWith("@color/")) {
+                if (resourceResolver != null) {
+                    color = resourceResolver.getColor(ref);
+                }
+            } else {
+                try {
+                    color = ColorParser.parse(ref);
+                } catch (ResourceException ignored) {
+                    color = null;
+                }
+            }
+            return color != null ? new ColorDrawable(color) : null;
+        }
+        // @drawable/foo, XML inline, couleur nommée — délégation à resolve()
+        try {
+            return resolve(ref, context);
+        } catch (RuntimeException e) {
+            // Un item cassé ne doit pas casser tout le selector
+            return null;
+        }
+    }
+
+    /**
+     * Convertit les états d'un {@link SelectorConfig.SelectorItem} en
+     * {@code int[]} pour {@link StateListDrawable#addState(int[], Drawable)}.
+     *
+     * <p>Un état à {@code true} utilise l'attribut positif, à {@code false}
+     * l'attribut négé (préfixé par {@code -}), conformément au protocole
+     * {@code Drawable.setState(int[])}.</p>
+     */
+    private static int[] toStateSet(SelectorConfig.SelectorItem item) {
+        List<Integer> states = new ArrayList<>();
+        addState(states, android.R.attr.state_pressed, item.getStatePressed());
+        addState(states, android.R.attr.state_enabled, item.getStateEnabled());
+        addState(states, android.R.attr.state_focused, item.getStateFocused());
+        addState(states, android.R.attr.state_checked, item.getStateChecked());
+        addState(states, android.R.attr.state_selected, item.getStateSelected());
+        addState(states, android.R.attr.state_window_focused,
+                item.getStateWindowFocused());
+        addState(states, android.R.attr.state_checkable, item.getStateCheckable());
+        int[] result = new int[states.size()];
+        for (int i = 0; i < result.length; i++) {
+            result[i] = states.get(i);
+        }
+        return result;
+    }
+
+    /**
+     * Ajoute un état (positif ou négé) à la liste.
+     */
+    private static void addState(List<Integer> states, int attr, Boolean value) {
+        if (value != null) {
+            states.add(value ? attr : -attr);
+        }
     }
 
     /**
      * Crée un VectorDrawable à partir d'un XML de vector.
+     *
+     * <p>Implémentation via l'inflation native du framework
+     * ({@link Drawable#createFromXml(Resources, XmlPullParser)}), disponible
+     * pour {@code <vector>} depuis l'API 21 (minSdk = 24) — pas besoin de
+     * {@code VectorDrawableCompat} (qui imposerait une dépendance AndroidX
+     * à ce module). En cas d'échec (XML invalide, JVM sans Resources réel),
+     * retourne {@code null} sans lever : l'attribut est simplement ignoré.</p>
      */
     private Drawable createVectorDrawable(String xml, Context context) {
-        // La création d'un VectorDrawable nécessite l'API VectorDrawableCompat
-        // ou l'utilisation de XmlResourceParser. Cette implémentation
-        // retourne null pour l'instant.
-        // TODO: implémenter via VectorDrawableCompat.createFromXml()
-        return null;
+        if (context == null) {
+            return null;
+        }
+        try {
+            XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
+            factory.setNamespaceAware(true);
+            XmlPullParser parser = factory.newPullParser();
+            parser.setInput(new StringReader(xml));
+            return Drawable.createFromXml(context.getResources(), parser);
+        } catch (XmlPullParserException | IOException | RuntimeException e) {
+            // VectorDrawable invalide ou Resources indisponible (tests JVM) —
+            // fallback silencieux, l'attribut est ignoré
+            return null;
+        }
     }
 
     /**

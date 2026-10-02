@@ -1,5 +1,6 @@
 package jo.layoutlib.attributes.format;
 
+import jo.layoutlib.resources.api.AttributeFormat;
 import jo.layoutlib.resources.DimensionConverter;
 import jo.layoutlib.resources.ResourceException;
 

@@ -1,5 +1,6 @@
 package jo.layoutlib.inflater;
 
+import android.util.Log;
 import android.content.Context;
 import android.util.AttributeSet;
 import android.view.View;
@@ -60,6 +61,9 @@ import jo.layoutlib.resources.ResourceResolver;
  */
 public class BridgeInflater {
 
+    /** Tag de journalisation. */
+    private static final String TAG = "BridgeInflater";
+
     /** Contexte Android. */
     private final Context context;
 
@@ -87,6 +91,9 @@ public class BridgeInflater {
 
     /** Indique si le inflater doit lever une exception sur les attributs inconnus. */
     private boolean strictMode = false;
+
+    /** Registre d'attributs (module-attributes) pour le mode strict. */
+    private jo.layoutlib.attributes.AttributeRegistry attributeRegistry;
 
     /**
      * Construit un inflater par défaut avec les classes Design préférées.
@@ -117,10 +124,18 @@ public class BridgeInflater {
      * {@code <include layout="@layout/foo" />} et les références
      * {@code @color/}, {@code @string/}, etc.
      *
+     * <p>Le résolveur est également propagé à l'{@link AttributeApplier}
+     * courant (s il existe), afin que la résolution des attributs
+     * {@code @color/}/{@code @string/}/{@code @dimen/} ne dépende pas de
+     * l ordre d appel des setters.</p>
+     *
      * @param resolver le résolveur, ou {@code null} pour désactiver la résolution
      */
     public void setResourceResolver(ResourceResolver resolver) {
         this.resourceResolver = resolver;
+        if (attributeApplier != null) {
+            attributeApplier.setResourceResolver(resolver);
+        }
     }
 
     /**
@@ -140,6 +155,13 @@ public class BridgeInflater {
     }
 
     /**
+     * @return l'AttributeApplier courant (peut être {@code null})
+     */
+    public AttributeApplier getAttributeApplier() {
+        return attributeApplier;
+    }
+
+    /**
      * Active ou désactive le mode strict.
      *
      * <p>En mode strict, tout attribut non reconnu lève une
@@ -150,6 +172,55 @@ public class BridgeInflater {
      */
     public void setStrictMode(boolean strict) {
         this.strictMode = strict;
+    }
+
+    /**
+     * Définit le registre d'attributs utilisé par le mode strict
+     * (intégration du module-attributes).
+     *
+     * <p>En mode strict, chaque attribut {@code android:*}/{@code app:*} du
+     * layout est vérifié contre ce registre : un attribut inconnu lève une
+     * {@link InflateException}. Sans registre, le mode strict garde son
+     * comportement historique (vérifications ponctuelles).</p>
+     *
+     * @param attributeRegistry le registre (ex. {@code CompositeAttributeRegistry}
+     *                           combinant framework + Material + AndroidX),
+     *                           ou {@code null} pour désactiver
+     */
+    public void setAttributeRegistry(jo.layoutlib.attributes.AttributeRegistry attributeRegistry) {
+        this.attributeRegistry = attributeRegistry;
+    }
+
+    /**
+     * @return le registre d'attributs du mode strict (peut être {@code null})
+     */
+    public jo.layoutlib.attributes.AttributeRegistry getAttributeRegistry() {
+        return attributeRegistry;
+    }
+
+    /**
+     * Vérifie les attributs du START_TAG courant contre le registre
+     * (mode strict uniquement).
+     *
+     * <p>Visibilité package : testable unitairement.</p>
+     *
+     * @throws InflateException si un attribut est inconnu du registre
+     */
+    void checkKnownAttributes(XmlPullParser parser) {
+        if (!strictMode || attributeRegistry == null) {
+            return;
+        }
+        for (int i = 0; i < parser.getAttributeCount(); i++) {
+            String name = parser.getAttributeName(i);
+            if (name == null || name.isEmpty()) {
+                continue;
+            }
+            if (!attributeRegistry.isKnownAttribute(name)) {
+                throw new InflateException(
+                        "Attribut inconnu en mode strict : '" + name
+                                + "' (non déclaré dans le registre d'attributs)");
+            }
+        }
     }
 
     /**
@@ -250,6 +321,10 @@ public class BridgeInflater {
         // car XmlPullAttributes ne peut pas être casté en XmlBlock.Parser sur Android 14+
         // Les attributs sont appliqués manuellement via AttributeApplier
         View view = viewFactory.createView(tag);
+
+        // Mode strict + registre d'attributs (module-attributes) :
+        // tout attribut android:/app: inconnu du registre lève avant application
+        checkKnownAttributes(parser);
 
         // Appliquer tous les attributs XML via les setters natifs
         if (attributeApplier != null) {
@@ -520,7 +595,7 @@ public class BridgeInflater {
                     new android.widget.LinearLayout.LayoutParams(widthVal, heightVal);
             String weight = getAttributeValue(parser, "android", "layout_weight");
             if (weight != null) {
-                try { llLp.weight = Float.parseFloat(weight); } catch (NumberFormatException ignored) {}
+                try { llLp.weight = Float.parseFloat(weight); } catch (NumberFormatException e) { Log.w(TAG, "Valeur numérique invalide, ignorée : " + e.getMessage()); }
             }
             String gravity = getAttributeValue(parser, "android", "layout_gravity");
             if (gravity != null) {
@@ -561,7 +636,7 @@ public class BridgeInflater {
                     new android.widget.TableRow.LayoutParams(widthVal, heightVal);
             String weight = getAttributeValue(parser, "android", "layout_weight");
             if (weight != null) {
-                try { trLp.weight = Float.parseFloat(weight); } catch (NumberFormatException ignored) {}
+                try { trLp.weight = Float.parseFloat(weight); } catch (NumberFormatException e) { Log.w(TAG, "Valeur numérique invalide, ignorée : " + e.getMessage()); }
             }
             lp = trLp;
         } else if (isConstraintLayout(parent)) {
@@ -979,11 +1054,13 @@ public class BridgeInflater {
                             field.setInt(lp, id != 0 ? id : View.generateViewId());
                         }
                     } else if (field.getType() == float.class) {
-                        try { field.setFloat(lp, Float.parseFloat(value)); } catch (NumberFormatException ignored) {}
+                        try { field.setFloat(lp, Float.parseFloat(value)); } catch (NumberFormatException e) { Log.w(TAG, "Valeur numérique invalide, ignorée : " + e.getMessage()); }
                     } else if (field.getType() == String.class) {
                         field.set(lp, value);
                     }
                 } catch (NoSuchFieldException ignored) {
+                    // Voulu : le LayoutParams du parent n'expose pas ce champ
+                    // (réflexion) — attribut ignoré
                 }
             }
 
@@ -1062,6 +1139,9 @@ public class BridgeInflater {
             return (ViewGroup.LayoutParams) lp;
 
         } catch (Exception e) {
+            // Voulu : réflexion (ClassNotFoundException, InvocationTargetException,
+            // IllegalAccessException…) — si la classe de LayoutParams spécifique
+            // n'est pas disponible, fallback MarginLayoutParams générique
             return new ViewGroup.MarginLayoutParams(width, height);
         }
     }

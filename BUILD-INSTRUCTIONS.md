@@ -16,7 +16,7 @@ maven {
 // layout-editor-app/build.gradle.kts
 val codeEditorVersion = "v3.41.0"   // tag Git de jjoblab/code-editor
 dependencies {
-    implementation("com.github.jjoblab:cel-ui:$codeEditorVersion")
+    implementation("com.github.jjoblab.code-editor:cel-ui:$codeEditorVersion")
 }
 ```
 
@@ -24,7 +24,7 @@ dependencies {
 
 **Remarques**
 - Au premier build, JitPack construit la bibliothèque à la demande depuis le tag : la première résolution peut être lente ou échouer (timeout) ; relancer le build.
-- Si JitPack publie les modules sous `com.github.jjoblab.code-editor:cel-ui` (groupe multi-modules), adapter la coordonnée dans `layout-editor-app/build.gradle.kts`.
+- **Coordonnée confirmée** : le dépôt étant multi-modules, JitPack publie sous le groupe `com.github.jjoblab.code-editor` (vérifié : `https://jitpack.io/com/github/jjoblab/code-editor/cel-ui/v3.41.0/`).
 - Alternative : GitHub Packages (`jo.codeeditor:cel-ui:3.41.0`, dépôt `https://maven.pkg.github.com/jjoblab/code-editor`) — nécessite `gpr.user` / `gpr.key` dans `~/.gradle/gradle.properties`.
 
 ## Outils requis

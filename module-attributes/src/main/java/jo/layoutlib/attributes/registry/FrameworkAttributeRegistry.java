@@ -1,10 +1,10 @@
 package jo.layoutlib.attributes.registry;
 
+import jo.layoutlib.resources.api.AttributeFormat;
 import java.util.HashMap;
 import java.util.Map;
 
 import jo.layoutlib.attributes.api.AttributeDefinitionImpl;
-import jo.layoutlib.attributes.AttributeFormat;
 
 /**
  * Registre des attributs du framework Android, inspiré de l AOSP.

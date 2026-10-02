@@ -156,10 +156,9 @@ public class ResourceFileParser {
                 table.putBoolean(name, parseBooleanText(parser), qualifier);
                 return 1;
             case "string-array":
+                table.putStringArray(name, parseStringArrayItems(parser), qualifier);
+                return 1;
             case "plurals":
-                // Stockés comme string avec suffixe — pour usage simple
-                // (l'API getString ne distingue pas les arrays)
-                return 0;
             case "item":
                 // Élément générique (parfois utilisé pour les typed values)
                 return 0;
@@ -198,6 +197,44 @@ public class ResourceFileParser {
             }
         }
         return sb.toString().trim();
+    }
+
+    /**
+     * Extrait les éléments {@code <item>} d'un {@code <string-array>}.
+     *
+     * <p>Le parser est positionné sur le START_TAG de l'array ; en sortie, il
+     * est positionné juste après son END_TAG.</p>
+     *
+     * @param parser le parser positionné sur le START_TAG de l'array
+     * @return la liste des éléments (peut être vide)
+     */
+    private java.util.List<String> parseStringArrayItems(XmlPullParser parser)
+            throws XmlPullParserException, IOException {
+        java.util.List<String> items = new java.util.ArrayList<>();
+        int depth = 1;
+        StringBuilder current = new StringBuilder();
+        boolean inItem = false;
+        while (depth > 0) {
+            int event = parser.next();
+            if (event == XmlPullParser.START_TAG) {
+                depth++;
+                if ("item".equals(parser.getName())) {
+                    inItem = true;
+                    current.setLength(0);
+                }
+            } else if (event == XmlPullParser.TEXT && inItem) {
+                current.append(parser.getText());
+            } else if (event == XmlPullParser.END_TAG) {
+                depth--;
+                if (inItem) {
+                    items.add(current.toString().trim());
+                    inItem = false;
+                }
+            } else if (event == XmlPullParser.END_DOCUMENT) {
+                break;
+            }
+        }
+        return items;
     }
 
     /**

@@ -4,6 +4,7 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -15,10 +16,13 @@ import android.view.animation.RotateAnimation;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
+import android.widget.PopupMenu;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.widget.NestedScrollView;
 
@@ -28,12 +32,14 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import jo.codeeditor.document.EditorDocument;
+import jo.layoutlib.drawables.DrawableResolverImpl;
 import jo.layoutlib.inflater.ComponentPalettePopup;
 import jo.layoutlib.inflater.DeviceProfile;
 import jo.layoutlib.inflater.OverlayView;
 import jo.layoutlib.inflater.RenderService;
 import jo.layoutlib.inflater.ViewInfoCollector;
 import jo.layoutlib.inflater.BlueprintListView;
+import jo.layoutlib.themes.ThemeResolverImpl;
 import jo.layoutlib.resources.DimensionConverter;
 import jo.layoutlib.resources.ResourceResolverImpl;
 import jo.layoutlib.resources.ResourceTable;
@@ -67,6 +73,7 @@ public class MainActivity extends AppCompatActivity {
     // ---- Services du mini-layoutlib ----
     private RenderService renderService;
     private ResourceResolverImpl resourceResolver;
+    private ThemeResolverImpl themeResolver;
     private OverlayView overlayView;
 
     // ---- code-editor-lib ----
@@ -120,6 +127,27 @@ public class MainActivity extends AppCompatActivity {
     private Runnable pendingHistoryPush;
     private static final long HISTORY_DEBOUNCE_MS = 1000;
 
+    // ---- Fichier courant (Storage Access Framework) ----
+    private Uri currentFileUri;
+    private String currentFileName = "activity_login.xml";
+    private final ActivityResultLauncher<String[]> openLauncher =
+            registerForActivityResult(
+                    new ActivityResultContracts.OpenDocument(),
+                    result -> {
+                        if (result != null) {
+                            openDocument(result);
+                        }
+                    });
+    private final ActivityResultLauncher<String> saveAsLauncher =
+            registerForActivityResult(
+                    new ActivityResultContracts.CreateDocument("text/xml"),
+                    result -> {
+                        if (result != null) {
+                            currentFileUri = result;
+                            saveCurrentDocument();
+                        }
+                    });
+
     /** XML par défaut chargé au démarrage. */
     private static final String DEFAULT_XML =
             "<LinearLayout xmlns:android=\"http://schemas.android.com/apk/res/android\"\n" +
@@ -172,7 +200,7 @@ public class MainActivity extends AppCompatActivity {
         editorView.setSession(session);
         editorView.setTheme(makeMaterialDarkTheme());
         editorView.setLanguage(null);
-        editorView.setFileName("activity_login.xml");
+        editorView.setFileName(currentFileName);
         suppressTextWatcher = false;
         undoRedoManager.pushState(DEFAULT_XML);
         refreshUndoRedoButtons();
@@ -193,6 +221,45 @@ public class MainActivity extends AppCompatActivity {
 
         // Render initial
         designScroll.post(() -> renderService.requestImmediateRender(DEFAULT_XML));
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+
+        // 1. Annuler le push d'historique debouncé en attente
+        if (pendingHistoryPush != null) {
+            historyHandler.removeCallbacks(pendingHistoryPush);
+            pendingHistoryPush = null;
+        }
+
+        // 2. Arrêter toute animation en cours (FAB)
+        if (fab != null) {
+            fab.clearAnimation();
+            fab.animate().cancel();
+        }
+
+        // 3. Refermer la palette de composants si ouverte
+        if (palettePopup != null) {
+            if (palettePopup.isShowing()) {
+                palettePopup.dismiss();
+            }
+            palettePopup = null;
+        }
+
+        // 4. Libérer le RenderService : annule les rendus debouncés en
+        //    attente, retire le callback (plus de notification vers une
+        //    Activity détruite) et coupe la référence vers le Context.
+        if (renderService != null) {
+            renderService.release();
+            renderService = null;
+        }
+
+        // 5. Couper les références restantes vers la hiérarchie rendue
+        overlayView = null;
+        renderedRoot = null;
+        currentRootInfo = null;
+        selectedView = null;
     }
 
     // ============================================================
@@ -279,6 +346,19 @@ public class MainActivity extends AppCompatActivity {
         resourceResolver = new ResourceResolverImpl(table);
         resourceResolver.setDimensionConverter(new DimensionConverter(density, fontScale, xdpi));
         renderService.setResourceResolver(resourceResolver);
+
+        // ═══ DrawableResolver — shapes, selectors, vectors @drawable/ ═══
+        // (repli sur les Resources natives si la résolution échoue)
+        renderService.setDrawableResolver(
+                new DrawableResolverImpl(resourceResolver,
+                        new DimensionConverter(density, fontScale, xdpi)));
+
+        // ═══ ThemeResolver — ?attr/ depuis themes.xml/styles.xml ═══
+        // (repli sur le thème natif si l'attribut n'y est pas défini)
+        themeResolver = new ThemeResolverImpl(resourceResolver,
+                new DimensionConverter(density, fontScale, xdpi));
+        themeResolver.setTheme("Theme.MaterialComponents.DayNight");
+        renderService.setThemeResolver(themeResolver);
 
         renderService.setRenderCallback(new RenderService.RenderCallback() {
             @Override
@@ -998,16 +1078,8 @@ public class MainActivity extends AppCompatActivity {
         editorView.setSession(session);
         editorView.setTheme(makeMaterialDarkTheme());
         editorView.setLanguage(null);
-        editorView.setFileName("activity_login.xml");
-        session.setOnTextEditListener((s, e, i) -> {
-            if (suppressTextWatcher) return;
-            String x = session.getText();
-            if (!x.isEmpty()) {
-                renderService.requestRender(x);
-                scheduleHistoryPush(x);
-            }
-            refreshUndoRedoButtons();
-        });
+        editorView.setFileName(currentFileName);
+        wireSessionListener();
         suppressTextWatcher = false;
         renderService.requestRender(newXml);
         scheduleHistoryPush(newXml);
@@ -1035,25 +1107,178 @@ public class MainActivity extends AppCompatActivity {
                     .start();
             performRedo();
         });
-        btnExport.setOnClickListener(v -> {
-            if (session == null) return;
-            String xml = session.getText();
-            ClipboardManager clipboard =
-                    (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-            if (clipboard != null) {
-                ClipData clip = ClipData.newPlainText("XML", xml);
-                clipboard.setPrimaryClip(clip);
-                if (currentRootInfo != null) {
-                    int count = ViewInfoCollector.countViews(currentRootInfo);
-                    Toast.makeText(this,
-                            getString(R.string.toast_export_done, count, 0),
-                            Toast.LENGTH_SHORT).show();
-                } else {
-                    Toast.makeText(this, R.string.toast_xml_copied, Toast.LENGTH_SHORT).show();
-                }
+        btnExport.setOnClickListener(v -> copyXmlToClipboard());
+        btnMore.setOnClickListener(v -> showMoreMenu(v));
+    }
+
+    /**
+     * Menu « Plus » : ouverture/enregistrement via le Storage Access
+     * Framework (aucune permission de stockage) + export presse-papiers.
+     */
+    private void showMoreMenu(View anchor) {
+        PopupMenu menu = new PopupMenu(this, anchor);
+        menu.getMenu().add(0, 1, 0, getString(R.string.menu_open));
+        menu.getMenu().add(0, 2, 1, getString(R.string.menu_save));
+        menu.getMenu().add(0, 3, 2, getString(R.string.menu_save_as));
+        menu.getMenu().add(0, 4, 3, getString(R.string.menu_copy_xml));
+        menu.setOnMenuItemClickListener(item -> {
+            switch (item.getItemId()) {
+                case 1:
+                    openLauncher.launch(new String[]{"text/xml", "application/xml"});
+                    return true;
+                case 2:
+                    if (currentFileUri != null) {
+                        saveCurrentDocument();
+                    } else {
+                        saveAsLauncher.launch(currentFileName);
+                    }
+                    return true;
+                case 3:
+                    saveAsLauncher.launch(currentFileName);
+                    return true;
+                case 4:
+                default:
+                    copyXmlToClipboard();
+                    return true;
             }
         });
-        btnMore.setOnClickListener(v ->
-                Toast.makeText(this, "Plus d'options (TODO)", Toast.LENGTH_SHORT).show());
+        menu.show();
+    }
+
+    /** Copie le XML courant dans le presse-papiers (ancien bouton Exporter). */
+    private void copyXmlToClipboard() {
+        if (session == null) return;
+        String xml = session.getText();
+        ClipboardManager clipboard =
+                (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+        if (clipboard != null) {
+            ClipData clip = ClipData.newPlainText("XML", xml);
+            clipboard.setPrimaryClip(clip);
+            if (currentRootInfo != null) {
+                int count = ViewInfoCollector.countViews(currentRootInfo);
+                Toast.makeText(this,
+                        getString(R.string.toast_export_done, count, 0),
+                        Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, R.string.toast_xml_copied, Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    /**
+     * Ouvre le document désigné par l'URI SAF et le charge dans l'éditeur.
+     */
+    private void openDocument(Uri uri) {
+        String xml = readTextFromUri(uri);
+        if (xml == null) {
+            Toast.makeText(this, R.string.toast_open_failed, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        currentFileUri = uri;
+        currentFileName = queryDisplayName(uri);
+        suppressTextWatcher = true;
+        EditorDocument doc = EditorDocument.of(xml);
+        session = new EditorSession(doc);
+        session.setLanguage("xml");
+        editorView.setSession(session);
+        editorView.setTheme(makeMaterialDarkTheme());
+        editorView.setLanguage(null);
+        editorView.setFileName(currentFileName);
+        suppressTextWatcher = false;
+        wireSessionListener();
+        undoRedoManager.clear();
+        undoRedoManager.pushState(xml);
+        refreshUndoRedoButtons();
+        renderService.requestImmediateRender(xml);
+        Toast.makeText(this,
+                getString(R.string.toast_opened, currentFileName),
+                Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * Écrit le XML courant dans l'URI SAF (enregistrement).
+     */
+    private void saveCurrentDocument() {
+        if (session == null || currentFileUri == null) return;
+        String xml = session.getText();
+        boolean ok = writeTextToUri(currentFileUri, xml);
+        Toast.makeText(this,
+                ok ? getString(R.string.toast_saved, currentFileName)
+                        : getString(R.string.toast_save_failed),
+                Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * (Re)branche le listener de texte de la session courante sur le rendu.
+     */
+    private void wireSessionListener() {
+        session.setOnTextEditListener((start, end, inserted) -> {
+            if (suppressTextWatcher) return;
+            String xml = session.getText();
+            if (xml.trim().isEmpty()) {
+                showEmptyPreview();
+            } else {
+                renderService.requestRender(xml);
+                scheduleHistoryPush(xml);
+            }
+            refreshUndoRedoButtons();
+        });
+    }
+
+    /**
+     * Lit tout le contenu texte d'un Uri (SAF).
+     *
+     * @return le contenu UTF-8, ou null en cas d'erreur
+     */
+    private String readTextFromUri(Uri uri) {
+        try (java.io.InputStream in = getContentResolver().openInputStream(uri)) {
+            if (in == null) return null;
+            java.io.BufferedReader reader = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(in, java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line).append('\n');
+            }
+            return sb.toString();
+        } catch (java.io.IOException | RuntimeException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Écrit du texte dans un Uri (SAF).
+     *
+     * @return true si l'écriture a réussi
+     */
+    private boolean writeTextToUri(Uri uri, String text) {
+        try (java.io.OutputStream out = getContentResolver().openOutputStream(uri, "wt")) {
+            if (out == null) return false;
+            out.write(text.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return true;
+        } catch (java.io.IOException | RuntimeException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Nom d'affichage du document (pour le titre de l'éditeur).
+     */
+    private String queryDisplayName(Uri uri) {
+        try (android.database.Cursor cursor = getContentResolver().query(
+                uri, null, null, null, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                int idx = cursor.getColumnIndex(
+                        android.provider.OpenableColumns.DISPLAY_NAME);
+                if (idx >= 0) {
+                    String name = cursor.getString(idx);
+                    if (name != null) return name;
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // Voulu : fallback sur le dernier segment de l'URI
+        }
+        String last = uri.getLastPathSegment();
+        return last != null ? last : currentFileName;
     }
 }

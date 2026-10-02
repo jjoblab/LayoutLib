@@ -3,7 +3,7 @@
 // @author jo@Dev
 
 plugins {
-    id("com.android.library")
+    alias(libs.plugins.android.library)
 }
 
 android {
@@ -33,12 +33,12 @@ dependencies {
     api(project(":module-attributes"))
     api(project(":module-layout"))
 
-    implementation("androidx.annotation:annotation:1.8.0")
+    implementation(libs.androidx.annotation)
 
-    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
-    testImplementation("org.assertj:assertj-core:3.26.0")
-    androidTestImplementation("androidx.test.ext:junit:1.1.5")
-    androidTestImplementation("androidx.test:runner:1.5.2")
+    testImplementation(libs.junit.jupiter)
+    testImplementation(libs.assertj.core)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
 }
 
 tasks.withType<Test> {

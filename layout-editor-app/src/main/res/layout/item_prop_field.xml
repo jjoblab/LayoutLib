@@ -3,6 +3,7 @@
      Utilisé pour les 3 types : texte, couleur (avec swatch), select (avec chevron).
      Le type est configuré programmatiquement par PropertiesPanel. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/propFieldRoot"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -59,7 +60,7 @@
             android:layout_gravity="end|center_vertical"
             android:layout_marginEnd="9dp"
             android:src="@drawable/ic_chevron_right"
-            android:tint="@color/editor_on_surface_3"
+            app:tint="@color/editor_on_surface_3"
             android:rotation="90"
             android:visibility="gone" />
     </FrameLayout>

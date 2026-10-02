@@ -92,14 +92,14 @@ public class XmlMutator {
      */
     public static int findTagOffsetForId(String xml, String idName) {
         if (xml == null || idName == null) return -1;
-        String idPattern = "android:id=\"@+id/" + Pattern.quote(idName) + "\"";
-        int idx = xml.indexOf(idPattern.replace("\\", ""));
-        if (idx < 0) {
-            idPattern = "android:id=\"@id/" + Pattern.quote(idName) + "\"";
-            idx = xml.indexOf(idPattern.replace("\\", ""));
+        Matcher m = Pattern.compile(
+                "android:id=\"@\\+id/" + Pattern.quote(idName) + "\"").matcher(xml);
+        if (!m.find()) {
+            m = Pattern.compile(
+                    "android:id=\"@id/" + Pattern.quote(idName) + "\"").matcher(xml);
+            if (!m.find()) return -1;
         }
-        if (idx < 0) return -1;
-        return xml.lastIndexOf('<', idx);
+        return xml.lastIndexOf('<', m.start());
     }
 
     private static int findTagEnd(String xml, int tagStart) {

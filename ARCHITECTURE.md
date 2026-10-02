@@ -11,7 +11,7 @@ LayoutLib est organisé en 6 modules Gradle indépendants (+ `validation` et l'a
 ```
 layout-editor-app ──► module-inflater, module-resources, module-drawables,
         │             module-themes, module-attributes, module-layout
-        └──► com.github.jjoblab:cel-ui  (EditorView + EditorSession)
+        └──► com.github.jjoblab.code-editor:cel-ui  (EditorView + EditorSession)
 
 module-inflater   ──► module-resources, module-attributes, module-layout
 module-drawables  ──► module-resources
@@ -115,7 +115,7 @@ Tous livrés ; le détail des classes, de l'API et des limitations est dans le `
 
 Éditeur visuel de layouts : `MainActivity` relie `RenderService` (rendu automatique debouncé) à l'éditeur de code `EditorView`/`EditorSession`.
 
-L'éditeur de code est la bibliothèque externe [`jjoblab/code-editor`](https://github.com/jjoblab/code-editor), consommée comme **dépendance Maven** (`implementation("com.github.jjoblab:cel-ui:<version>")`) — pas de composite build. Ses packages (`jo.codeeditor.view`, `jo.codeeditor.session`, `jo.codeeditor.document`, `jo.codeeditor.view.chrome`) restent inchangés.
+L'éditeur de code est la bibliothèque externe [`jjoblab/code-editor`](https://github.com/jjoblab/code-editor), consommée comme **dépendance Maven** (`implementation("com.github.jjoblab.code-editor:cel-ui:<version>")`) — pas de composite build. Ses packages (`jo.codeeditor.view`, `jo.codeeditor.session`, `jo.codeeditor.document`, `jo.codeeditor.view.chrome`) restent inchangés.
 
 ## Stratégie de tests
 

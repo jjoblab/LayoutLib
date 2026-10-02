@@ -24,6 +24,9 @@ import java.util.Map;
  */
 public class ViewFactory {
 
+    /** Tag de journalisation. */
+    private static final String TAG = "ViewFactory";
+
     private final Context context;
     private final ViewTagRegistry tagRegistry;
     private final Map<String, Constructor<?>> constructorCache = new HashMap<>();
@@ -95,7 +98,8 @@ public class ViewFactory {
             constructorCache.put(className + (attrs != null ? "_attrs" : ""), constructor);
         }
         try {
-            if (attrs != null && constructor.getParameterCount() == 2) {
+            // getParameterTypes().length plutôt que getParameterCount() (API 26+).
+            if (attrs != null && constructor.getParameterTypes().length == 2) {
                 return (View) constructor.newInstance(context, attrs);
             } else {
                 return (View) constructor.newInstance(context);
@@ -145,6 +149,7 @@ public class ViewFactory {
             try {
                 return clazz.getConstructor(Context.class, AttributeSet.class);
             } catch (NoSuchMethodException ignored) {
+                // Voulu : probing des variantes de constructeurs par réflexion
             }
         }
 
@@ -152,18 +157,21 @@ public class ViewFactory {
         try {
             return clazz.getConstructor(Context.class);
         } catch (NoSuchMethodException ignored) {
+            // Voulu : probing des variantes de constructeurs par réflexion
         }
 
         // 3. (Context, AttributeSet) même si pas d'attrs
         try {
             return clazz.getConstructor(Context.class, AttributeSet.class);
         } catch (NoSuchMethodException ignored) {
+            // Voulu : probing des variantes de constructeurs par réflexion
         }
 
         // 4. () par défaut
         try {
             return clazz.getConstructor();
         } catch (NoSuchMethodException ignored) {
+            // Voulu : probing des variantes de constructeurs par réflexion
         }
 
         throw new InflateException(

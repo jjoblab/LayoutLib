@@ -1,6 +1,6 @@
 package jo.layoutlib.attributes.format;
 
-import jo.layoutlib.attributes.AttributeFormat;
+import jo.layoutlib.resources.api.AttributeFormat;
 
 /**
  * Validateur de format d attribut.

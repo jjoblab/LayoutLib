@@ -10,11 +10,15 @@ import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
 
+import java.io.IOException;
 import java.io.StringReader;
 
+import jo.layoutlib.drawables.DrawableResolver;
+import jo.layoutlib.inflater.bridge.util.Debug;
 import jo.layoutlib.layout.LayoutEngineImpl;
 import jo.layoutlib.resources.DimensionConverter;
 import jo.layoutlib.resources.ResourceResolver;
+import jo.layoutlib.themes.ThemeResolver;
 
 /**
  * Service de rendu asynchrone avec debounce, inspiré du
@@ -27,8 +31,11 @@ import jo.layoutlib.resources.ResourceResolver;
  *   <li><strong>Validation XML préalable</strong> : si le XML est malformé
  *       (en cours de frappe), le rendu est annulé silencieusement et le
  *       dernier rendu valide est conservé — comme Android Studio</li>
- *   <li><strong>Annulation</strong> : si un nouveau rendu est demandé pendant
- *       qu'un est en cours, le précédent est annulé</li>
+ *   <li><strong>Rendu synchrone</strong> : {@code doRender()} s'exécute
+ *       intégralement sur le thread appelant (le thread principal) ; il n'y a
+ *       pas de rendu concurrent à annuler. Si une demande arrive pendant un
+ *       rendu (re-entrée défensive), elle est rejouée juste après via
+ *       {@code reRenderRequested}</li>
  *   <li><strong>Callback</strong> : notifie l'appelant avec le résultat
  *       (vue racine + métriques) ou l'erreur</li>
  * </ul>
@@ -44,6 +51,11 @@ import jo.layoutlib.resources.ResourceResolver;
  *   <li>Si valide et succès → callback de succès</li>
  * </ol>
  *
+ * <p>La validation s'appuie exclusivement sur {@link XmlPullParser} (pas
+ * d'heuristique sur le texte) : un attribut entre apostrophes contenant des
+ * guillemets, ou un commentaire avec un nombre impair de guillemets, restent
+ * du XML valide.</p>
+ *
  * @author jo@Dev
  * @since 1.0
  */
@@ -52,7 +64,7 @@ public class RenderService {
     public static final long DEFAULT_DEBOUNCE_MS = 400;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final Context context;
+    private Context context;
     private final BridgeInflater inflater;
     private final LayoutEngineImpl layoutEngine;
 
@@ -65,29 +77,55 @@ public class RenderService {
     private boolean rendering = false;
     private boolean reRenderRequested = false;
 
+    /** Convertisseur de dimensions courant (gardé pour reconstruire l'applier). */
+    private DimensionConverter dimensionConverter;
+
+    /** Résolveur de ressources courant (gardé pour reconstruire l'applier). */
+    private ResourceResolver resourceResolver;
+
+    /** Résolveur de drawables courant (gardé pour reconstruire l'applier). */
+    private DrawableResolver drawableResolver;
+
+    /** Résolveur de thèmes courant (gardé pour reconstruire l'applier). */
+    private ThemeResolver themeResolver;
+
     /** Indique si au moins un rendu réussi a été fait (pour garder le dernier valide). */
     private boolean hasValidRender = false;
 
+    /** Indique si {@link #release()} a été appelé (service non réutilisable). */
+    private boolean released = false;
+
+    /** Seuil (ms) au-delà duquel un rendu sur le thread UI est journalisé. */
+    private static final long SLOW_RENDER_WARN_MS = 32;
+
     /**
      * Callback de rendu.
+     *
+     * <p><strong>Contrat de thread</strong> : toutes les méthodes de cette
+     * interface sont invoquées sur le <em>thread principal</em> — le rendu
+     * ({@code doRender()}) y est debouncé et exécuté de façon synchrone. Les
+     * implémentations n ont donc <strong>pas besoin</strong> de re-poster via
+     * {@code runOnUiThread(…)}.</p>
      *
      * @author jo@Dev
      */
     public interface RenderCallback {
 
         /**
-         * Appelé quand le rendu réussit.
+         * Appelé quand le rendu réussit (thread principal).
          */
         void onRenderSuccess(View rootView, long timeMs, int viewCount,
                               int width, int height);
 
         /**
-         * Appelé quand le rendu échoue (XML valide mais erreur sémantique).
+         * Appelé quand le rendu échoue (XML valide mais erreur sémantique,
+         * thread principal).
          */
         void onRenderError(String message, Throwable cause);
 
         /**
-         * Appelé quand le XML est invalide (en cours de frappe).
+         * Appelé quand le XML est invalide (en cours de frappe,
+         * thread principal).
          * Le preview doit garder le dernier rendu valide.
          */
         default void onXmlInvalid(String message) {
@@ -106,23 +144,156 @@ public class RenderService {
         layoutEngine.setDensity(density);
         layoutEngine.setFontScale(fontScale);
 
-        AttributeApplier applier = new AttributeApplier(context,
-                new DimensionConverter(density, fontScale, xdpi));
-        inflater.setAttributeApplier(applier);
+        this.dimensionConverter =
+                new DimensionConverter(density, fontScale, xdpi);
+        rebuildAttributeApplier();
     }
 
+    /**
+     * Définit le résolveur de ressources du pipeline de rendu.
+     *
+     * <p>Le résolveur est propagé au {@link BridgeInflater} (pour les
+     * {@code <include>} et références de layout) <em>et</em> à
+     * l'{@link AttributeApplier}, afin que {@code @color/}, {@code @string/}
+     * et {@code @dimen/} soient résolus par le résolveur quel que soit l ordre
+     * des appels {@code setDimensionConverter()} / {@code setResourceResolver()}.</p>
+     *
+     * @param resolver le résolveur, ou {@code null} pour revenir aux
+     *                 {@code Resources} natives
+     */
     public void setResourceResolver(ResourceResolver resolver) {
+        ensureNotReleased();
+        this.resourceResolver = resolver;
         inflater.setResourceResolver(resolver);
+        rebuildAttributeApplier();
     }
 
+    /**
+     * @return le résolveur de ressources courant (peut être {@code null})
+     */
+    public ResourceResolver getResourceResolver() {
+        return resourceResolver;
+    }
+
+    /**
+     * Remplace le convertisseur de dimensions utilisé par l'applier.
+     *
+     * <p>L'{@link AttributeApplier} est reconstruit avec le convertisseur
+     * fourni <em>et</em> le résolveur courant : le résultat est indépendant de
+     * l ordre des appels {@code setDimensionConverter()} /
+     * {@code setResourceResolver()}.</p>
+     *
+     * @param converter le nouveau convertisseur
+     */
     public void setDimensionConverter(DimensionConverter converter) {
-        AttributeApplier applier = new AttributeApplier(context, converter,
-                inflater.getResourceResolver());
+        ensureNotReleased();
+        this.dimensionConverter = converter;
+        rebuildAttributeApplier();
+    }
+
+    /**
+     * @return le convertisseur de dimensions courant
+     */
+    public DimensionConverter getDimensionConverter() {
+        return dimensionConverter;
+    }
+
+    /**
+     * Définit le résolveur de drawables du pipeline de rendu
+     * ({@code @drawable/} : shapes, selectors, vectors).
+     *
+     * <p>Propagé à l'{@link AttributeApplier} courant — quel que soit l'ordre
+     * des appels des autres setters.</p>
+     *
+     * @param drawableResolver le résolveur, ou {@code null} pour revenir aux
+     *                         {@code Resources} natives uniquement
+     */
+    public void setDrawableResolver(DrawableResolver drawableResolver) {
+        ensureNotReleased();
+        this.drawableResolver = drawableResolver;
+        AttributeApplier applier = inflater.getAttributeApplier();
+        if (applier != null) {
+            applier.setDrawableResolver(drawableResolver);
+        }
+    }
+
+    /**
+     * @return le résolveur de drawables courant (peut être {@code null})
+     */
+    public DrawableResolver getDrawableResolver() {
+        return drawableResolver;
+    }
+
+    /**
+     * Définit le résolveur de thèmes du pipeline de rendu (module-themes) :
+     * résolution {@code ?attr/} et {@code ?android:attr/} depuis les
+     * themes.xml/styles.xml du projet.
+     *
+     * <p>Propagé à l'{@link AttributeApplier} courant ; en cas de rebuild de
+     * l'applier (setDimensionConverter/setResourceResolver), il est
+     * conservé.</p>
+     *
+     * @param themeResolver le résolveur, ou {@code null} pour revenir au
+     *                      thème natif uniquement
+     */
+    public void setThemeResolver(ThemeResolver themeResolver) {
+        ensureNotReleased();
+        this.themeResolver = themeResolver;
+        AttributeApplier applier = inflater.getAttributeApplier();
+        if (applier != null) {
+            applier.setThemeResolver(themeResolver);
+        }
+    }
+
+    /**
+     * @return le résolveur de thèmes courant (peut être {@code null})
+     */
+    public ThemeResolver getThemeResolver() {
+        return themeResolver;
+    }
+
+    /**
+     * Reconstruit l'{@link AttributeApplier} avec le convertisseur et le
+     * résolveur courants, et l installe dans le inflater.
+     */
+    private void rebuildAttributeApplier() {
+        AttributeApplier applier = new AttributeApplier(context,
+                dimensionConverter, resourceResolver);
+        applier.setDrawableResolver(drawableResolver);
+        applier.setThemeResolver(themeResolver);
         inflater.setAttributeApplier(applier);
     }
 
-    public void setRenderCallback(RenderCallback callback) {
-        this.callback = callback;
+    /**
+     * Libère le service — à appeler depuis {@code Activity.onDestroy()}.
+     *
+     * <p>Idempotent. Après cet appel :</p>
+     * <ul>
+     *   <li>les rendus en attente (debounce, re-render) sont annulés ;</li>
+     *   <li>le callback est retiré (plus aucune notification vers une
+     *       Activity en cours de destruction) ;</li>
+     *   <li>la référence vers le {@link Context} est coupée (plus de fuite
+     *       de l'Activity par le service) ;</li>
+     *   <li>les setters ultérieurs lèvent une {@link IllegalStateException}.</li>
+     * </ul>
+     */
+    public void release() {
+        if (released) {
+            return;
+        }
+        released = true;
+        cancelPending();
+        reRenderRequested = false;
+        callback = null;
+        inflater.reset();
+        context = null;
+    }
+
+    /**
+     * @return {@code true} si {@link #release()} a été appelé
+     */
+    public boolean isReleased() {
+        return released;
     }
 
     public void setDebounceMs(long ms) {
@@ -134,6 +305,22 @@ public class RenderService {
         this.targetHeight = height;
     }
 
+    public void setRenderCallback(RenderCallback callback) {
+        this.callback = callback;
+    }
+
+    /**
+     * Garantit que le service n a pas été libéré.
+     *
+     * @throws IllegalStateException si {@link #release()} a été appelé
+     */
+    private void ensureNotReleased() {
+        if (released) {
+            throw new IllegalStateException(
+                    "RenderService déjà libéré (release()) : créez une nouvelle instance");
+        }
+    }
+
     /**
      * Demande un rendu du XML avec debounce.
      *
@@ -143,6 +330,9 @@ public class RenderService {
      * @param xml le XML à rendre
      */
     public void requestRender(String xml) {
+        if (released) {
+            return;
+        }
         pendingXml = xml;
 
         if (pendingRender != null) {
@@ -168,6 +358,9 @@ public class RenderService {
      * @param xml le XML à rendre
      */
     public void requestImmediateRender(String xml) {
+        if (released) {
+            return;
+        }
         pendingXml = xml;
         if (pendingRender != null) {
             mainHandler.removeCallbacks(pendingRender);
@@ -191,9 +384,12 @@ public class RenderService {
     }
 
     /**
-     * Effectue le rendu.
+     * Effectue le rendu — synchrone, sur le thread principal.
      */
     private void doRender() {
+        if (released) {
+            return;
+        }
         final String xml = pendingXml;
         if (xml == null || xml.trim().isEmpty()) {
             // XML vide — ne pas afficher d'erreur, juste ignorer
@@ -236,6 +432,18 @@ public class RenderService {
 
             long elapsed = (System.nanoTime() - start) / 1_000_000;
 
+            // Télémétrie : le rendu est synchrone sur le thread principal —
+            // au-delà de ~2 frames (32 ms), il y a un risque de jank visible.
+            // Voir le rapport d'architecture : les View doivent être créées et
+            // mesurées sur le thread UI, la solution n'est PAS un thread de
+            // rendu, mais une métrique pour décider d'une éventuelle
+            // découpe (inflation progressive) sur gros layouts.
+            if (elapsed > SLOW_RENDER_WARN_MS) {
+                Debug.logWarning("render",
+                        "Rendu lent sur le thread UI : " + elapsed + " ms pour "
+                                + viewCount + " vues");
+            }
+
             hasValidRender = true;
 
             // Callback de succès
@@ -265,73 +473,63 @@ public class RenderService {
      *
      * <p>Cette méthode ne valide pas le schéma Android, uniquement la
      * conformité XML. Elle est utilisée pour filtrer les XML en cours
-     * de frappe (ex: "android:background=" en cours de saisie).</p>
+     * de frappe (ex: {@code android:background="} en cours de saisie).</p>
      *
-     * <p>Vérifications :</p>
-     * <ul>
-     *   <li>Le XML commence par {@code <}</li>
-     *   <li>Tous les tags ouverts sont fermés</li>
-     *   <li>Les attributs ont des valeurs entre guillemets</li>
-     *   <li>Pas de caractères illégaux</li>
-     * </ul>
+     * <p>La validation s'appuie <strong>exclusivement</strong> sur
+     * {@link XmlPullParser} — aucune heuristique sur le texte (comptage de
+     * guillemets, recherche de {@code =}…) qui rejetterait à tort du XML
+     * valide, comme {@code <TextView android:text='Dis "bonjour' />}</code>
+     * (guillemet dans une valeur entre apostrophes) ou un commentaire
+     * contenant un nombre impair de guillemets.</p>
+     *
+     * <p>Visibilité package : testable unitairement.</p>
      *
      * @param xml le XML à valider
      * @return true si le XML est bien formé
      */
-    private boolean isXmlWellFormed(String xml) {
-        if (xml == null || xml.trim().isEmpty()) {
+    static boolean isXmlWellFormed(String xml) {
+        if (xml == null) {
             return false;
         }
-
-        // Vérification rapide : doit commencer par <
         String trimmed = xml.trim();
-        if (!trimmed.startsWith("<")) {
+        if (trimmed.isEmpty()) {
             return false;
         }
-
-        // Vérification rapide : attribut sans valeur (ex: android:text= sans ")
-        // Détecte les patterns comme = sans guillemet suivant
-        if (trimmed.contains("=\"") == false && trimmed.contains("='") == false) {
-            // Pas d'attribut avec valeur — OK si c'est juste un tag simple
-            // Mais si on a un = sans guillemet, c'est invalide
-            if (trimmed.contains("=") && !trimmed.contains("=\"") && !trimmed.contains("='")) {
-                return false;
-            }
-        }
-
-        // Vérification : attribut incomplet (ex: android:text=" sans fermer le guillemet)
-        // Compte les guillemets non échappés
-        int doubleQuotes = 0;
-        boolean inString = false;
-        for (int i = 0; i < trimmed.length(); i++) {
-            char c = trimmed.charAt(i);
-            if (c == '"' && (i == 0 || trimmed.charAt(i - 1) != '\\')) {
-                doubleQuotes++;
-            }
-        }
-        if (doubleQuotes % 2 != 0) {
-            // Nombre impair de guillemets → attribut incomplet
-            return false;
-        }
-
-        // Validation complète avec XmlPullParser
         try {
-            XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
-            factory.setNamespaceAware(true);
-            XmlPullParser parser = factory.newPullParser();
+            XmlPullParser parser = obtainParserFactory().newPullParser();
             parser.setInput(new StringReader(trimmed));
-
             int event = parser.getEventType();
             while (event != XmlPullParser.END_DOCUMENT) {
                 event = parser.next();
             }
             return true;
-        } catch (XmlPullParserException e) {
+        } catch (XmlPullParserException | IOException e) {
             // XML malformé — en cours de frappe
             return false;
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
+            // kxml2 lève une RuntimeException (non contrôlée) pour certains
+            // XML invalides, ex. « Undefined Prefix » quand xmlns:android
+            // n'est pas encore déclaré. Un validateur ne doit jamais lever.
             return false;
         }
+    }
+
+    /**
+     * Factory {@link XmlPullParserFactory} mise en cache : la recréer à chaque
+     * rendu (comme à chaque frappe debouncée) est inutilement coûteux.
+     *
+     * <p>La factory est thread-safe pour la création de parseurs ; chaque
+     * parseur reste local à son appelant.</p>
+     */
+    private static XmlPullParserFactory parserFactory;
+
+    private static synchronized XmlPullParserFactory obtainParserFactory()
+            throws XmlPullParserException {
+        if (parserFactory == null) {
+            parserFactory = XmlPullParserFactory.newInstance();
+            parserFactory.setNamespaceAware(true);
+        }
+        return parserFactory;
     }
 
     /**
