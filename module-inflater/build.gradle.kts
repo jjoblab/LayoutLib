@@ -3,7 +3,7 @@
 // @author jo@Dev
 
 plugins {
-    id("com.android.library")
+    alias(libs.plugins.android.library)
 }
 
 android {
@@ -39,21 +39,19 @@ dependencies {
     api(project(":module-themes"))
 
     // AndroidX core
-    implementation("androidx.core:core:1.13.1")
-    implementation("androidx.annotation:annotation:1.8.0")
+    implementation(libs.androidx.core)
+    implementation(libs.androidx.annotation)
 
     // Tests unitaires JVM (JUnit 5)
-    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
-    testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
-    testImplementation("org.junit.jupiter:junit-jupiter-engine:5.10.2")
-    testImplementation("org.assertj:assertj-core:3.26.0")
-    testImplementation("net.sf.kxml:kxml2:2.3.0")
-    testImplementation("org.mockito:mockito-core:5.14.2")
+    testImplementation(libs.junit.jupiter)
+    testImplementation(libs.assertj.core)
+    testImplementation(libs.kxml2)
+    testImplementation(libs.mockito.core)
 
     // Tests instrumentés Android
-    androidTestImplementation("androidx.test.ext:junit:1.1.5")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
-    androidTestImplementation("androidx.test:runner:1.5.2")
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.espresso.core)
+    androidTestImplementation(libs.androidx.test.runner)
 }
 
 tasks.withType<Test> {

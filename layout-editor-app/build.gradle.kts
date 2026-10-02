@@ -2,11 +2,8 @@
 // @author jo@Dev
 
 plugins {
-    id("com.android.application")
+    alias(libs.plugins.android.application)
 }
-
-// Version (tag Git) de jjoblab/code-editor
-val codeEditorVersion = "v3.41.0"
 
 android {
     namespace = "jo.layoutlib.editor"
@@ -18,10 +15,28 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
-        release { isMinifyEnabled = false }
+        release {
+            // R8 désactivé pour l'instant : ViewFactory instancie les vues
+            // par réflexion (Class.forName), ce qu'R8 ne voit pas — les
+            // règles nécessaires sont prêtes dans proguard-rules.pro. Pour
+            // activer la minification : isMinifyEnabled = true (puis vérifier
+            // le rendu sur un vrai appareil avant distribution).
+            isMinifyEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
+
+    // BuildConfig n'est plus généré globalement (gradle.properties) : seul
+    // le module qui l'utilise réellement (CrashActivity) le demande.
+    buildFeatures {
+        buildConfig = true
     }
 
     compileOptions {
@@ -45,17 +60,17 @@ dependencies {
     // code-editor (github.com/jjoblab/code-editor) — EditorView + EditorSession.
     // Dépôt multi-modules : JitPack publie sous com.github.jjoblab.code-editor.
     // cel-ui expose cel-core et cel-lsp-api en `api` (transitif).
-    implementation("com.github.jjoblab.code-editor:cel-ui:$codeEditorVersion")
+    implementation(libs.code.editor)
 
-    implementation("androidx.appcompat:appcompat:1.7.0")
-    implementation("androidx.core:core:1.13.1")
-    implementation("androidx.recyclerview:recyclerview:1.3.2")
-    implementation("com.google.android.material:material:1.12.0")
-    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+    implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.core)
+    implementation(libs.androidx.recyclerview)
+    implementation(libs.material)
+    implementation(libs.androidx.constraintlayout)
 
     // Tests unitaires JVM (XmlMutator, UndoRedoManager)
-    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
-    testImplementation("org.assertj:assertj-core:3.26.0")
+    testImplementation(libs.junit.jupiter)
+    testImplementation(libs.assertj.core)
 }
 
 tasks.withType<Test> {

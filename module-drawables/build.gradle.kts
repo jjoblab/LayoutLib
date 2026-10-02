@@ -3,7 +3,7 @@
 // @author jo@Dev
 
 plugins {
-    id("com.android.library")
+    alias(libs.plugins.android.library)
 }
 
 android {
@@ -12,6 +12,7 @@ android {
 
     defaultConfig {
         minSdk = 24
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {
@@ -26,12 +27,12 @@ android {
 
 dependencies {
     api(project(":module-resources"))
-    implementation("androidx.annotation:annotation:1.8.0")
+    implementation(libs.androidx.annotation)
 
-    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
-    testImplementation("org.assertj:assertj-core:3.26.0")
-    testImplementation("net.sf.kxml:kxml2:2.3.0")
-    androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    testImplementation(libs.junit.jupiter)
+    testImplementation(libs.assertj.core)
+    testImplementation(libs.kxml2)
+    androidTestImplementation(libs.androidx.test.ext.junit)
 }
 
 tasks.withType<Test> {

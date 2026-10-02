@@ -2,8 +2,8 @@
 // @author jo@Dev
 
 plugins {
-    id("com.android.library") version "8.5.0" apply false
-    id("com.android.application") version "8.5.0" apply false
+    alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.android.application) apply false
 }
 
 // Tâche utilitaire : exécute les tests JVM de tous les modules
@@ -16,6 +16,7 @@ tasks.register("testAllModules") {
         ":module-drawables:test",
         ":module-themes:test",
         ":module-attributes:test",
-        ":module-layout:test"
+        ":module-layout:test",
+        ":validation:test"
     )
 }

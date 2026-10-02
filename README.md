@@ -12,7 +12,7 @@
 
 Android Studio utilise `layoutlib` (~85 000 lignes, ~400 classes) pour afficher un rendu fidèle des layouts XML dans l'éditeur visuel. Mais `layoutlib` dépend de `java.awt` (desktop only), embarque 50 MB de natives par ABI et nécessite ~80 MB de resources du SDK. Aucune app mobile publique ne l'utilise on-device.
 
-**LayoutLib** couvre 95 % des cas d'usage avec ~23 000 lignes au lieu de 85 000, dans une architecture 6 modules indépendants testables séparément.
+**LayoutLib** couvre 95 % des cas d'usage avec ~32 000 lignes au lieu de 85 000, dans une architecture 6 modules indépendants testables séparément.
 
 ## Architecture — 6 modules
 
@@ -37,19 +37,19 @@ Package principal : `jo.layoutlib` (un sous-package par module : `jo.layoutlib.i
 
 | Module | Statut | Classes | Integration dans le pipeline |
 |--------|--------|---------|------------------------------|
-| Module 1 — Inflater | ✅ Intégré | 90 classes | Cœur du pipeline (`RenderService`, `BridgeInflater`, `AttributeApplier`) |
+| Module 1 — Inflater | ✅ Intégré | 85 classes | Cœur du pipeline (`RenderService`, `BridgeInflater`, `AttributeApplier` par famille de widgets) |
 | Module 2 — Resources | ✅ Intégré | 96 classes | `ResourceResolver` consulté pour `@color/`, `@string/`, `@dimen/`, `@array/` |
-| Module 3 — Drawables | ✅ Intégré | 74 classes | `DrawableResolver` consulté pour `@drawable/` (shapes, selectors, vectors) |
+| Module 3 — Drawables | ✅ Intégré | 15 classes | `DrawableResolver` consulté pour `@drawable/` (shapes, selectors, vectors) |
 | Module 4 — Themes | ✅ Intégré | 34 classes | `ThemeResolver` consulté pour `?attr/` (repli sur le thème natif) |
 | Module 5 — Attributes | ✅ Intégré | 41 classes | `AttributeRegistry` pilote le mode strict du `BridgeInflater` |
 | Module 6 — Layout | ✅ Intégré | 42 classes | `LayoutEngineImpl` fait la mesure + le layout de chaque rendu |
 | Validation | ✅ Livré | 7 classes | Hors pipeline : catalogue de 50 layouts de comparaison |
-| layout-editor-app | ✅ Livré | 9 classes | Consomme l'ensemble (app d'édition visuelle) |
-| **Total** | | **393 classes** | **~33 000 lignes** (main) |
+| layout-editor-app | ✅ Livré | 9 classes | Consomme l'ensemble (app d'édition visuelle, ouverture/SAF) |
+| **Total** | | **329 classes** | **~32 000 lignes** (main) |
 
 **Référence AOSP consultée :** https://android.googlesource.com/platform/frameworks/layoutlib (327 fichiers, 43 597 lignes) + tools/base/layoutlib-api (77 fichiers, 9 108 lignes)
 
-**Tests : 408 unitaires JVM** (`./gradlew testAllModules`) **+ tests instrumentés** (`connectedAndroidTest`, catalogue de 50 layouts, cf. `validation/`).
+**Tests : 868 unitaires JVM** (842 via `./gradlew testAllModules` + 26 pour l'app via `:layout-editor-app:testDebugUnitTest`) **+ tests instrumentés** (`connectedAndroidTest`, catalogue de 50 layouts, cf. `validation/`). CI GitHub Actions : `.github/workflows/ci.yml`.
 
 ## Démarrage rapide
 
@@ -135,10 +135,10 @@ export ANDROID_HOME=/path/to/android-sdk
 `layout-editor-app` utilise l'éditeur de code [`jjoblab/code-editor`](https://github.com/jjoblab/code-editor) (`EditorView`, `EditorSession`) comme **dépendance Maven** (JitPack), et non plus comme composite build :
 
 ```kotlin
-// layout-editor-app/build.gradle.kts
-val codeEditorVersion = "v3.41.0"
+// layout-editor-app/build.gradle.kts — coordonnées centralisées
+// dans gradle/libs.versions.toml (version codeEditor = "v3.41.0")
 dependencies {
-    implementation("com.github.jjoblab.code-editor:cel-ui:$codeEditorVersion")
+    implementation(libs.code.editor)
 }
 ```
 
