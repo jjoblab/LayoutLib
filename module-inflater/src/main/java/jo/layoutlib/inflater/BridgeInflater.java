@@ -1,5 +1,6 @@
 package jo.layoutlib.inflater;
 
+import android.util.Log;
 import android.content.Context;
 import android.util.AttributeSet;
 import android.view.View;
@@ -59,6 +60,9 @@ import jo.layoutlib.resources.ResourceResolver;
  * @since 1.0
  */
 public class BridgeInflater {
+
+    /** Tag de journalisation. */
+    private static final String TAG = "BridgeInflater";
 
     /** Contexte Android. */
     private final Context context;
@@ -591,7 +595,7 @@ public class BridgeInflater {
                     new android.widget.LinearLayout.LayoutParams(widthVal, heightVal);
             String weight = getAttributeValue(parser, "android", "layout_weight");
             if (weight != null) {
-                try { llLp.weight = Float.parseFloat(weight); } catch (NumberFormatException ignored) {}
+                try { llLp.weight = Float.parseFloat(weight); } catch (NumberFormatException e) { Log.w(TAG, "Valeur numérique invalide, ignorée : " + e.getMessage()); }
             }
             String gravity = getAttributeValue(parser, "android", "layout_gravity");
             if (gravity != null) {
@@ -632,7 +636,7 @@ public class BridgeInflater {
                     new android.widget.TableRow.LayoutParams(widthVal, heightVal);
             String weight = getAttributeValue(parser, "android", "layout_weight");
             if (weight != null) {
-                try { trLp.weight = Float.parseFloat(weight); } catch (NumberFormatException ignored) {}
+                try { trLp.weight = Float.parseFloat(weight); } catch (NumberFormatException e) { Log.w(TAG, "Valeur numérique invalide, ignorée : " + e.getMessage()); }
             }
             lp = trLp;
         } else if (isConstraintLayout(parent)) {
@@ -1050,11 +1054,13 @@ public class BridgeInflater {
                             field.setInt(lp, id != 0 ? id : View.generateViewId());
                         }
                     } else if (field.getType() == float.class) {
-                        try { field.setFloat(lp, Float.parseFloat(value)); } catch (NumberFormatException ignored) {}
+                        try { field.setFloat(lp, Float.parseFloat(value)); } catch (NumberFormatException e) { Log.w(TAG, "Valeur numérique invalide, ignorée : " + e.getMessage()); }
                     } else if (field.getType() == String.class) {
                         field.set(lp, value);
                     }
                 } catch (NoSuchFieldException ignored) {
+                    // Voulu : le LayoutParams du parent n'expose pas ce champ
+                    // (réflexion) — attribut ignoré
                 }
             }
 
@@ -1133,6 +1139,9 @@ public class BridgeInflater {
             return (ViewGroup.LayoutParams) lp;
 
         } catch (Exception e) {
+            // Voulu : réflexion (ClassNotFoundException, InvocationTargetException,
+            // IllegalAccessException…) — si la classe de LayoutParams spécifique
+            // n'est pas disponible, fallback MarginLayoutParams générique
             return new ViewGroup.MarginLayoutParams(width, height);
         }
     }

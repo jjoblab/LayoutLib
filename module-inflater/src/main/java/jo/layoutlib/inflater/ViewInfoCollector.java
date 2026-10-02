@@ -1,5 +1,6 @@
 package jo.layoutlib.inflater;
 
+import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 
@@ -30,6 +31,9 @@ import java.util.List;
  * @since 1.0
  */
 public class ViewInfoCollector {
+
+    /** Tag de journalisation. */
+    private static final String TAG = "ViewInfoCollector";
 
     /**
      * Information sur une vue dans la hiérarchie rendue.
@@ -136,7 +140,12 @@ public class ViewInfoCollector {
         if (id != View.NO_ID) {
             try {
                 idName = view.getContext().getResources().getResourceEntryName(id);
-            } catch (Exception ignored) {}
+            } catch (RuntimeException e) {
+                // Voulu : id de vue non déclaré dans les resources (généré) —
+                // pas de nom, la vue reste identifiée par son id numérique
+                Log.d(TAG, "getResourceEntryName(" + id + ") indisponible : "
+                        + e.getClass().getSimpleName());
+            }
         }
 
         // ── Positions ABSOLUES (root-relative) ───────────────────────────

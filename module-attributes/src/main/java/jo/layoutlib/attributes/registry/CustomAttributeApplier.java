@@ -1,5 +1,6 @@
 package jo.layoutlib.attributes.registry;
 
+import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 
@@ -10,6 +11,9 @@ import android.view.ViewGroup;
  * @since 1.0
  */
 public class CustomAttributeApplier {
+
+    /** Tag de journalisation. */
+    private static final String TAG = "CustomAttrApplier";
 
     /**
      * Applique un attribut sur une vue.
@@ -43,7 +47,7 @@ public class CustomAttributeApplier {
                 view.setSelected("true".equals(attrValue));
                 return true;
             case "alpha":
-                try { view.setAlpha(Float.parseFloat(attrValue)); } catch (Exception e) {}
+                try { view.setAlpha(Float.parseFloat(attrValue)); } catch (NumberFormatException e) { Log.w(TAG, "Valeur '" + attrValue + "' invalide, ignorée : " + e.getMessage()); }
                 return true;
             case "tag":
                 view.setTag(attrValue);

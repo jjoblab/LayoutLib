@@ -53,6 +53,9 @@ import jo.layoutlib.resources.ResourceResolver;
  */
 public class DrawableResolverImpl implements DrawableResolver {
 
+    /** Tag de journalisation. */
+    private static final String TAG = "DrawableResolver";
+
     /** Cache des drawables parsés, indexé par XML source. */
     private final Map<String, Drawable> drawableCache = new HashMap<>();
 
@@ -115,6 +118,8 @@ public class DrawableResolverImpl implements DrawableResolver {
                 drawableCache.put(reference, drawable);
                 return drawable;
             } catch (ResourceException ignored) {
+                // Voulu : couleur nommée inconnue — le fallback natif prend
+                // le relais (resolve() continue)
             }
         }
 
@@ -151,6 +156,8 @@ public class DrawableResolverImpl implements DrawableResolver {
             try {
                 return new ColorDrawable(ColorParser.parse(reference));
             } catch (ResourceException ignored) {
+                // Voulu : couleur nommée inconnue — le fallback natif prend
+                // le relais (resolve() continue)
             }
         }
 

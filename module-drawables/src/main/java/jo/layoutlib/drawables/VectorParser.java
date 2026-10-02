@@ -1,5 +1,6 @@
 package jo.layoutlib.drawables;
 
+import android.util.Log;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
@@ -24,6 +25,9 @@ import jo.layoutlib.resources.ResourceException;
  * @since 1.0
  */
 public class VectorParser {
+
+    /** Tag de journalisation. */
+    private static final String TAG = "VectorParser";
 
     /** Convertisseur de dimensions. */
     private final DimensionConverter dimensionConverter;
@@ -105,7 +109,10 @@ public class VectorParser {
         if (tint != null) {
             try {
                 config.setTint(ColorParser.parse(tint));
-            } catch (ResourceException ignored) {
+            } catch (ResourceException e) {
+                // Voulu : couleur/dimension invalide dans le vector — ignorée pour ne pas
+                // casser le parsing du drawable entier
+                Log.w(TAG, "Valeur invalide ignorée : " + e.getMessage());
             }
         }
         String tintMode = getAttribute(parser, "android", "tintMode");
@@ -167,14 +174,20 @@ public class VectorParser {
         if (fillColor != null) {
             try {
                 path.setFillColor(ColorParser.parse(fillColor));
-            } catch (ResourceException ignored) {
+            } catch (ResourceException e) {
+                // Voulu : couleur/dimension invalide dans le vector — ignorée pour ne pas
+                // casser le parsing du drawable entier
+                Log.w(TAG, "Valeur invalide ignorée : " + e.getMessage());
             }
         }
         String strokeColor = getAttribute(parser, "android", "strokeColor");
         if (strokeColor != null) {
             try {
                 path.setStrokeColor(ColorParser.parse(strokeColor));
-            } catch (ResourceException ignored) {
+            } catch (ResourceException e) {
+                // Voulu : couleur/dimension invalide dans le vector — ignorée pour ne pas
+                // casser le parsing du drawable entier
+                Log.w(TAG, "Valeur invalide ignorée : " + e.getMessage());
             }
         }
         path.setStrokeWidth(parseDimension(getAttribute(parser, "android", "strokeWidth")));

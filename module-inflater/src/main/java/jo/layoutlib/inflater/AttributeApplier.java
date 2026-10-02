@@ -334,7 +334,7 @@ public final class AttributeApplier {
         if (focusableInTouchMode != null) view.setFocusableInTouchMode("true".equals(focusableInTouchMode));
 
         String alpha = getAttr(parser, "alpha");
-        if (alpha != null) { try { view.setAlpha(Float.parseFloat(alpha)); } catch (NumberFormatException ignored) {} }
+        if (alpha != null) { try { view.setAlpha(Float.parseFloat(alpha)); } catch (NumberFormatException e) { logAttrError("alpha", e); } }
 
         String tag = getAttr(parser, "tag");
         if (tag != null) view.setTag(tag);
@@ -370,19 +370,19 @@ public final class AttributeApplier {
         if (contentDescription != null) view.setContentDescription(contentDescription);
 
         String rotation = getAttr(parser, "rotation");
-        if (rotation != null) { try { view.setRotation(Float.parseFloat(rotation)); } catch (NumberFormatException ignored) {} }
+        if (rotation != null) { try { view.setRotation(Float.parseFloat(rotation)); } catch (NumberFormatException e) { logAttrError("rotation", e); } }
 
         String rotationX = getAttr(parser, "rotationX");
-        if (rotationX != null) { try { view.setRotationX(Float.parseFloat(rotationX)); } catch (NumberFormatException ignored) {} }
+        if (rotationX != null) { try { view.setRotationX(Float.parseFloat(rotationX)); } catch (NumberFormatException e) { logAttrError("rotationX", e); } }
 
         String rotationY = getAttr(parser, "rotationY");
-        if (rotationY != null) { try { view.setRotationY(Float.parseFloat(rotationY)); } catch (NumberFormatException ignored) {} }
+        if (rotationY != null) { try { view.setRotationY(Float.parseFloat(rotationY)); } catch (NumberFormatException e) { logAttrError("rotationY", e); } }
 
         String scaleX = getAttr(parser, "scaleX");
-        if (scaleX != null) { try { view.setScaleX(Float.parseFloat(scaleX)); } catch (NumberFormatException ignored) {} }
+        if (scaleX != null) { try { view.setScaleX(Float.parseFloat(scaleX)); } catch (NumberFormatException e) { logAttrError("scaleX", e); } }
 
         String scaleY = getAttr(parser, "scaleY");
-        if (scaleY != null) { try { view.setScaleY(Float.parseFloat(scaleY)); } catch (NumberFormatException ignored) {} }
+        if (scaleY != null) { try { view.setScaleY(Float.parseFloat(scaleY)); } catch (NumberFormatException e) { logAttrError("scaleY", e); } }
 
         String translationX = getAttr(parser, "translationX");
         if (translationX != null) view.setTranslationX(parseDim(translationX));
@@ -398,7 +398,7 @@ public final class AttributeApplier {
 
         String backgroundColor = getAttr(parser, "backgroundColor");
         if (backgroundColor != null) {
-            try { view.setBackgroundColor(ColorParser.parse(backgroundColor)); } catch (Exception ignored) {}
+            try { view.setBackgroundColor(ColorParser.parse(backgroundColor)); } catch (RuntimeException e) { logAttrError("backgroundColor", e); }
         }
 
         String foreground = getAttr(parser, "foreground");
@@ -436,7 +436,7 @@ public final class AttributeApplier {
         if (textColor != null) applyTextColor(tv, textColor);
 
         String textSize = getAttr(parser, "textSize");
-        if (textSize != null) { try { tv.setTextSize(TypedValue.COMPLEX_UNIT_PX, parseDim(textSize)); } catch (Exception ignored) {} }
+        if (textSize != null) { try { tv.setTextSize(TypedValue.COMPLEX_UNIT_PX, parseDim(textSize)); } catch (RuntimeException e) { logAttrError("textSize", e); } }
 
         String textStyle = getAttr(parser, "textStyle");
         if (textStyle != null) {
@@ -453,7 +453,7 @@ public final class AttributeApplier {
         if (hint != null) tv.setHint(hint);
 
         String textColorHint = getAttr(parser, "textColorHint");
-        if (textColorHint != null) { try { tv.setHintTextColor(ColorParser.parse(textColorHint)); } catch (Exception ignored) {} }
+        if (textColorHint != null) { try { tv.setHintTextColor(ColorParser.parse(textColorHint)); } catch (RuntimeException e) { logAttrError("textColorHint", e); } }
 
         String textAlignment = getAttr(parser, "textAlignment");
         if (textAlignment != null) {
@@ -468,22 +468,22 @@ public final class AttributeApplier {
         }
 
         String maxLines = getAttr(parser, "maxLines");
-        if (maxLines != null) { try { tv.setMaxLines(Integer.parseInt(maxLines)); } catch (NumberFormatException ignored) {} }
+        if (maxLines != null) { try { tv.setMaxLines(Integer.parseInt(maxLines)); } catch (NumberFormatException e) { logAttrError("maxLines", e); } }
 
         String minLines = getAttr(parser, "minLines");
-        if (minLines != null) { try { tv.setMinLines(Integer.parseInt(minLines)); } catch (NumberFormatException ignored) {} }
+        if (minLines != null) { try { tv.setMinLines(Integer.parseInt(minLines)); } catch (NumberFormatException e) { logAttrError("minLines", e); } }
 
         String lines = getAttr(parser, "lines");
-        if (lines != null) { try { tv.setLines(Integer.parseInt(lines)); } catch (NumberFormatException ignored) {} }
+        if (lines != null) { try { tv.setLines(Integer.parseInt(lines)); } catch (NumberFormatException e) { logAttrError("lines", e); } }
 
         String maxEms = getAttr(parser, "maxEms");
-        if (maxEms != null) { try { tv.setMaxEms(Integer.parseInt(maxEms)); } catch (NumberFormatException ignored) {} }
+        if (maxEms != null) { try { tv.setMaxEms(Integer.parseInt(maxEms)); } catch (NumberFormatException e) { logAttrError("maxEms", e); } }
 
         String minEms = getAttr(parser, "minEms");
-        if (minEms != null) { try { tv.setMinEms(Integer.parseInt(minEms)); } catch (NumberFormatException ignored) {} }
+        if (minEms != null) { try { tv.setMinEms(Integer.parseInt(minEms)); } catch (NumberFormatException e) { logAttrError("minEms", e); } }
 
         String ems = getAttr(parser, "ems");
-        if (ems != null) { try { tv.setEms(Integer.parseInt(ems)); } catch (NumberFormatException ignored) {} }
+        if (ems != null) { try { tv.setEms(Integer.parseInt(ems)); } catch (NumberFormatException e) { logAttrError("ems", e); } }
 
         String ellipsize = getAttr(parser, "ellipsize");
         if (ellipsize != null) {
@@ -505,13 +505,13 @@ public final class AttributeApplier {
         if (minWidth != null) tv.setMinWidth(parseDim(minWidth));
 
         String letterSpacing = getAttr(parser, "letterSpacing");
-        if (letterSpacing != null) { try { tv.setLetterSpacing(Float.parseFloat(letterSpacing)); } catch (NumberFormatException ignored) {} }
+        if (letterSpacing != null) { try { tv.setLetterSpacing(Float.parseFloat(letterSpacing)); } catch (NumberFormatException e) { logAttrError("letterSpacing", e); } }
 
         String lineSpacingExtra = getAttr(parser, "lineSpacingExtra");
-        if (lineSpacingExtra != null) { try { tv.setLineSpacing(parseDim(lineSpacingExtra), 1f); } catch (Exception ignored) {} }
+        if (lineSpacingExtra != null) { try { tv.setLineSpacing(parseDim(lineSpacingExtra), 1f); } catch (RuntimeException e) { logAttrError("lineSpacingExtra", e); } }
 
         String lineSpacingMultiplier = getAttr(parser, "lineSpacingMultiplier");
-        if (lineSpacingMultiplier != null) { try { tv.setLineSpacing(0f, Float.parseFloat(lineSpacingMultiplier)); } catch (NumberFormatException ignored) {} }
+        if (lineSpacingMultiplier != null) { try { tv.setLineSpacing(0f, Float.parseFloat(lineSpacingMultiplier)); } catch (NumberFormatException e) { logAttrError("lineSpacingMultiplier", e); } }
 
         String textAllCaps = getAttr(parser, "textAllCaps");
         if (textAllCaps != null) {
@@ -549,7 +549,7 @@ public final class AttributeApplier {
                         shadowDx != null ? Float.parseFloat(shadowDx) : 0,
                         shadowDy != null ? Float.parseFloat(shadowDy) : 0,
                         ColorParser.parse(shadowColor));
-            } catch (Exception ignored) {}
+            } catch (RuntimeException e) { logAttrError("shadowRadius", e); }
         }
 
         String fontFamily = getAttr(parser, "fontFamily");
@@ -599,7 +599,7 @@ public final class AttributeApplier {
 
         String button = getAttr(parser, "button");
         if (button != null) {
-            try { cb.setButtonDrawable(ColorParser.parse(button)); } catch (Exception ignored) {}
+            try { cb.setButtonDrawable(ColorParser.parse(button)); } catch (RuntimeException e) { logAttrError("button", e); }
         }
     }
 
@@ -635,7 +635,7 @@ public final class AttributeApplier {
         if (maxHeight != null) iv.setMaxHeight(parseDim(maxHeight));
 
         String tint = getAttr(parser, "tint");
-        if (tint != null) { try { iv.setColorFilter(ColorParser.parse(tint)); } catch (Exception ignored) {} }
+        if (tint != null) { try { iv.setColorFilter(ColorParser.parse(tint)); } catch (RuntimeException e) { logAttrError("tint", e); } }
 
         String cropToPadding = getAttr(parser, "cropToPadding");
         if (cropToPadding != null) iv.setCropToPadding("true".equals(cropToPadding));
@@ -647,13 +647,13 @@ public final class AttributeApplier {
 
     private void applyProgressBarAttributes(ProgressBar pb, XmlPullParser parser) {
         String max = getAttr(parser, "max");
-        if (max != null) { try { pb.setMax(Integer.parseInt(max)); } catch (NumberFormatException ignored) {} }
+        if (max != null) { try { pb.setMax(Integer.parseInt(max)); } catch (NumberFormatException e) { logAttrError("max", e); } }
 
         String progress = getAttr(parser, "progress");
-        if (progress != null) { try { pb.setProgress(Integer.parseInt(progress)); } catch (NumberFormatException ignored) {} }
+        if (progress != null) { try { pb.setProgress(Integer.parseInt(progress)); } catch (NumberFormatException e) { logAttrError("progress", e); } }
 
         String secondaryProgress = getAttr(parser, "secondaryProgress");
-        if (secondaryProgress != null) { try { pb.setSecondaryProgress(Integer.parseInt(secondaryProgress)); } catch (NumberFormatException ignored) {} }
+        if (secondaryProgress != null) { try { pb.setSecondaryProgress(Integer.parseInt(secondaryProgress)); } catch (NumberFormatException e) { logAttrError("secondaryProgress", e); } }
 
         String progressDrawable = getAttr(parser, "progressDrawable");
         if (progressDrawable != null) {
@@ -671,12 +671,12 @@ public final class AttributeApplier {
         }
 
         String progressTint = getAttr(parser, "progressTint");
-        if (progressTint != null) { try { pb.setProgressTintList(android.content.res.ColorStateList.valueOf(ColorParser.parse(progressTint))); } catch (Exception ignored) {} }
+        if (progressTint != null) { try { pb.setProgressTintList(android.content.res.ColorStateList.valueOf(ColorParser.parse(progressTint))); } catch (RuntimeException e) { logAttrError("progressTint", e); } }
 
         String min = getAttr(parser, "min");
         // ProgressBar#setMin n existe qu à partir de l API 26 (minSdk = 24).
         if (min != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            try { pb.setMin(Integer.parseInt(min)); } catch (NumberFormatException ignored) {}
+            try { pb.setMin(Integer.parseInt(min)); } catch (NumberFormatException e) { logAttrError("min", e); }
         }
     }
 
@@ -691,18 +691,18 @@ public final class AttributeApplier {
         if (splitTrack != null) sb.setSplitTrack("true".equals(splitTrack));
 
         String thumbOffset = getAttr(parser, "thumbOffset");
-        if (thumbOffset != null) { try { sb.setThumbOffset(parseDim(thumbOffset)); } catch (Exception ignored) {} }
+        if (thumbOffset != null) { try { sb.setThumbOffset(parseDim(thumbOffset)); } catch (RuntimeException e) { logAttrError("thumbOffset", e); } }
     }
 
     private void applyRatingBarAttributes(RatingBar rb, XmlPullParser parser) {
         String numStars = getAttr(parser, "numStars");
-        if (numStars != null) { try { rb.setNumStars(Integer.parseInt(numStars)); } catch (NumberFormatException ignored) {} }
+        if (numStars != null) { try { rb.setNumStars(Integer.parseInt(numStars)); } catch (NumberFormatException e) { logAttrError("numStars", e); } }
 
         String rating = getAttr(parser, "rating");
-        if (rating != null) { try { rb.setRating(Float.parseFloat(rating)); } catch (NumberFormatException ignored) {} }
+        if (rating != null) { try { rb.setRating(Float.parseFloat(rating)); } catch (NumberFormatException e) { logAttrError("rating", e); } }
 
         String stepSize = getAttr(parser, "stepSize");
-        if (stepSize != null) { try { rb.setStepSize(Float.parseFloat(stepSize)); } catch (NumberFormatException ignored) {} }
+        if (stepSize != null) { try { rb.setStepSize(Float.parseFloat(stepSize)); } catch (NumberFormatException e) { logAttrError("stepSize", e); } }
 
         String isIndicator = getAttr(parser, "isIndicator");
         if (isIndicator != null) rb.setIsIndicator("true".equals(isIndicator));
@@ -785,7 +785,7 @@ public final class AttributeApplier {
             if ("auto_fit".equals(numColumns)) {
                 gv.setNumColumns(GridView.AUTO_FIT);
             } else {
-                try { gv.setNumColumns(Integer.parseInt(numColumns)); } catch (NumberFormatException ignored) {}
+                try { gv.setNumColumns(Integer.parseInt(numColumns)); } catch (NumberFormatException e) { logAttrError("numColumns", e); }
             }
         }
 
@@ -827,7 +827,7 @@ public final class AttributeApplier {
         if (gravity != null) ll.setGravity(parseGravity(gravity));
 
         String weightSum = getAttr(parser, "weightSum");
-        if (weightSum != null) { try { ll.setWeightSum(Float.parseFloat(weightSum)); } catch (NumberFormatException ignored) {} }
+        if (weightSum != null) { try { ll.setWeightSum(Float.parseFloat(weightSum)); } catch (NumberFormatException e) { logAttrError("weightSum", e); } }
 
         String baselineAligned = getAttr(parser, "baselineAligned");
         if (baselineAligned != null) ll.setBaselineAligned("true".equals(baselineAligned));
@@ -881,10 +881,10 @@ public final class AttributeApplier {
                 ? GridLayout.HORIZONTAL : GridLayout.VERTICAL);
 
         String columnCount = getAttr(parser, "columnCount");
-        if (columnCount != null) { try { gl.setColumnCount(Integer.parseInt(columnCount)); } catch (NumberFormatException ignored) {} }
+        if (columnCount != null) { try { gl.setColumnCount(Integer.parseInt(columnCount)); } catch (NumberFormatException e) { logAttrError("columnCount", e); } }
 
         String rowCount = getAttr(parser, "rowCount");
-        if (rowCount != null) { try { gl.setRowCount(Integer.parseInt(rowCount)); } catch (NumberFormatException ignored) {} }
+        if (rowCount != null) { try { gl.setRowCount(Integer.parseInt(rowCount)); } catch (NumberFormatException e) { logAttrError("rowCount", e); } }
 
         String useDefaultMargins = getAttr(parser, "useDefaultMargins");
         if (useDefaultMargins != null) gl.setUseDefaultMargins("true".equals(useDefaultMargins));
@@ -931,7 +931,7 @@ public final class AttributeApplier {
 
     private void applyCalendarViewAttributes(CalendarView cv, XmlPullParser parser) {
         String firstDayOfWeek = getAttr(parser, "firstDayOfWeek");
-        if (firstDayOfWeek != null) { try { cv.setFirstDayOfWeek(Integer.parseInt(firstDayOfWeek)); } catch (NumberFormatException ignored) {} }
+        if (firstDayOfWeek != null) { try { cv.setFirstDayOfWeek(Integer.parseInt(firstDayOfWeek)); } catch (NumberFormatException e) { logAttrError("firstDayOfWeek", e); } }
 
         String minDate = getAttr(parser, "minDate");
         // TODO: parse date
@@ -940,7 +940,7 @@ public final class AttributeApplier {
         // TODO: parse date
 
         String shownWeekCount = getAttr(parser, "shownWeekCount");
-        if (shownWeekCount != null) { try { cv.setShownWeekCount(Integer.parseInt(shownWeekCount)); } catch (NumberFormatException ignored) {} }
+        if (shownWeekCount != null) { try { cv.setShownWeekCount(Integer.parseInt(shownWeekCount)); } catch (NumberFormatException e) { logAttrError("shownWeekCount", e); } }
     }
 
     private void applyChronometerAttributes(Chronometer ch, XmlPullParser parser) {
@@ -964,13 +964,13 @@ public final class AttributeApplier {
 
     private void applyNumberPickerAttributes(NumberPicker np, XmlPullParser parser) {
         String minValue = getAttr(parser, "minValue");
-        if (minValue != null) { try { np.setMinValue(Integer.parseInt(minValue)); } catch (NumberFormatException ignored) {} }
+        if (minValue != null) { try { np.setMinValue(Integer.parseInt(minValue)); } catch (NumberFormatException e) { logAttrError("minValue", e); } }
 
         String maxValue = getAttr(parser, "maxValue");
-        if (maxValue != null) { try { np.setMaxValue(Integer.parseInt(maxValue)); } catch (NumberFormatException ignored) {} }
+        if (maxValue != null) { try { np.setMaxValue(Integer.parseInt(maxValue)); } catch (NumberFormatException e) { logAttrError("maxValue", e); } }
 
         String value = getAttr(parser, "value");
-        if (value != null) { try { np.setValue(Integer.parseInt(value)); } catch (NumberFormatException ignored) {} }
+        if (value != null) { try { np.setValue(Integer.parseInt(value)); } catch (NumberFormatException e) { logAttrError("value", e); } }
 
         String wrapSelectorWheel = getAttr(parser, "wrapSelectorWheel");
         if (wrapSelectorWheel != null) np.setWrapSelectorWheel("true".equals(wrapSelectorWheel));
@@ -989,7 +989,7 @@ public final class AttributeApplier {
 
     private void applyViewAnimatorAttributes(ViewAnimator va, XmlPullParser parser) {
         String displayedChild = getAttr(parser, "displayedChild");
-        if (displayedChild != null) { try { va.setDisplayedChild(Integer.parseInt(displayedChild)); } catch (NumberFormatException ignored) {} }
+        if (displayedChild != null) { try { va.setDisplayedChild(Integer.parseInt(displayedChild)); } catch (NumberFormatException e) { logAttrError("displayedChild", e); } }
 
         String animateFirstView = getAttr(parser, "animateFirstView");
         if (animateFirstView != null) va.setAnimateFirstView("true".equals(animateFirstView));
@@ -1003,7 +1003,7 @@ public final class AttributeApplier {
         if (calendarViewShown != null) dp.setCalendarViewShown("true".equals(calendarViewShown));
 
         String firstDayOfWeek = getAttr(parser, "firstDayOfWeek");
-        if (firstDayOfWeek != null) { try { dp.setFirstDayOfWeek(Integer.parseInt(firstDayOfWeek)); } catch (NumberFormatException ignored) {} }
+        if (firstDayOfWeek != null) { try { dp.setFirstDayOfWeek(Integer.parseInt(firstDayOfWeek)); } catch (NumberFormatException e) { logAttrError("firstDayOfWeek", e); } }
     }
 
     private void applyTimePickerAttributes(TimePicker tp, XmlPullParser parser) {
@@ -1011,10 +1011,10 @@ public final class AttributeApplier {
         // Mode spinner vs clock — non géré en prévisualisation
 
         String hour = getAttr(parser, "hour");
-        if (hour != null) { try { tp.setHour(Integer.parseInt(hour)); } catch (NumberFormatException ignored) {} }
+        if (hour != null) { try { tp.setHour(Integer.parseInt(hour)); } catch (NumberFormatException e) { logAttrError("hour", e); } }
 
         String minute = getAttr(parser, "minute");
-        if (minute != null) { try { tp.setMinute(Integer.parseInt(minute)); } catch (NumberFormatException ignored) {} }
+        if (minute != null) { try { tp.setMinute(Integer.parseInt(minute)); } catch (NumberFormatException e) { logAttrError("minute", e); } }
 
         String am_pm = getAttr(parser, "am_pm");
         // Non géré
@@ -1037,7 +1037,7 @@ public final class AttributeApplier {
 
         String appBackgroundColor = getAppAttr(parser, "backgroundTint");
         if (appBackgroundColor != null) {
-            try { view.setBackgroundTintList(android.content.res.ColorStateList.valueOf(ColorParser.parse(appBackgroundColor))); } catch (Exception ignored) {}
+            try { view.setBackgroundTintList(android.content.res.ColorStateList.valueOf(ColorParser.parse(appBackgroundColor))); } catch (RuntimeException e) { logAttrError("backgroundTint", e); }
         }
 
         // CardView / MaterialCardView
@@ -1053,7 +1053,7 @@ public final class AttributeApplier {
             }
             String cardBackgroundColor = getAppAttr(parser, "cardBackgroundColor");
             if (cardBackgroundColor != null) {
-                try { view.setBackground(new ColorDrawable(ColorParser.parse(cardBackgroundColor))); } catch (Exception ignored) {}
+                try { view.setBackground(new ColorDrawable(ColorParser.parse(cardBackgroundColor))); } catch (RuntimeException e) { logAttrError("cardBackgroundColor", e); }
             }
             String contentPadding = getAppAttr(parser, "contentPadding");
             if (contentPadding != null) {
@@ -1105,12 +1105,12 @@ public final class AttributeApplier {
                     try {
                         ((android.graphics.drawable.GradientDrawable) btn.getBackground())
                                 .setStroke(parseDim(strokeWidth), ColorParser.parse(strokeColor));
-                    } catch (Exception ignored) {}
+                    } catch (RuntimeException e) { logAttrError("strokeWidth", e); }
                 }
             }
             String backgroundTint = getAppAttr(parser, "backgroundTint");
             if (backgroundTint != null) {
-                try { btn.setBackgroundTintList(android.content.res.ColorStateList.valueOf(ColorParser.parse(backgroundTint))); } catch (Exception ignored) {}
+                try { btn.setBackgroundTintList(android.content.res.ColorStateList.valueOf(ColorParser.parse(backgroundTint))); } catch (RuntimeException e) { logAttrError("backgroundTint", e); }
             }
         }
 
@@ -1130,7 +1130,7 @@ public final class AttributeApplier {
             }
             String tintColor = getAppAttr(parser, "tint");
             if (tintColor != null) {
-                try { iv.setColorFilter(ColorParser.parse(tintColor)); } catch (Exception ignored) {}
+                try { iv.setColorFilter(ColorParser.parse(tintColor)); } catch (RuntimeException e) { logAttrError("tint", e); }
             }
         }
 
@@ -1148,7 +1148,7 @@ public final class AttributeApplier {
         String chipStrokeWidth = getAppAttr(parser, "chipStrokeWidth");
         String chipCornerRadius = getAppAttr(parser, "chipCornerRadius");
         if (chipBackgroundColor != null && view instanceof android.widget.Button) {
-            try { view.setBackground(new ColorDrawable(ColorParser.parse(chipBackgroundColor))); } catch (Exception ignored) {}
+            try { view.setBackground(new ColorDrawable(ColorParser.parse(chipBackgroundColor))); } catch (RuntimeException e) { logAttrError("chipCornerRadius", e); }
         }
 
         // CoordinatorLayout / AppBarLayout app: attributs
@@ -1251,7 +1251,7 @@ public final class AttributeApplier {
                 Integer color = resolveThemeAttr(value);
                 if (color != null) tv.setTextColor(color);
             }
-        } catch (Exception ignored) {}
+        } catch (RuntimeException e) { logAttrError("tickVisible", e); }
     }
 
     private void applyBackground(View view, String value) {
@@ -1269,7 +1269,7 @@ public final class AttributeApplier {
                 Integer color = resolveThemeAttr(value);
                 if (color != null) view.setBackground(new ColorDrawable(color));
             }
-        } catch (Exception ignored) {}
+        } catch (RuntimeException e) { logAttrError("tickVisible", e); }
     }
 
     private void applyImageSrc(ImageView iv, String value) {
@@ -1283,7 +1283,7 @@ public final class AttributeApplier {
                 int id = context.getResources().getIdentifier(name, "drawable", "android");
                 if (id != 0) iv.setImageResource(id);
             }
-        } catch (Exception ignored) {}
+        } catch (RuntimeException e) { logAttrError("tickVisible", e); }
     }
 
     private void applyForeground(View view, String value) {
@@ -1298,7 +1298,7 @@ public final class AttributeApplier {
                     ((FrameLayout) view).setForeground(new ColorDrawable(color));
                 }
             }
-        } catch (Exception ignored) {}
+        } catch (RuntimeException e) { logAttrError("tickVisible", e); }
     }
 
     // ========================================================================
@@ -1515,6 +1515,23 @@ public final class AttributeApplier {
     }
 
     /**
+     * Journalise une erreur d'attribut sans interrompre le rendu.
+     *
+     * <p>Conformément au contrat du pipeline : une erreur sur un attribut
+     * (valeur non numérique, couleur invalide, etc.) est ignorée et
+     * journalisée avec son contexte — elle ne doit jamais interrompre le
+     * rendu du layout entier.</p>
+     *
+     * @param attr le nom de l'attribut concerné (approximatif si inconnu)
+     * @param e    l'exception attrapée
+     */
+    private static void logAttrError(String attr, RuntimeException e) {
+        Debug.logWarning("attributes",
+                "Attribut '" + attr + "' ignoré : " + e.getClass().getSimpleName()
+                        + (e.getMessage() != null ? " (" + e.getMessage() + ")" : ""));
+    }
+
+    /**
      * Résout une référence @color/ en valeur ARGB.
      * Utilise le ResourceResolver si disponible, sinon Resources natives.
      *
@@ -1533,18 +1550,18 @@ public final class AttributeApplier {
             String name = ref.substring("@color/".length());
             int id = context.getResources().getIdentifier(name, "color", context.getPackageName());
             if (id != 0) {
-                try { return context.getResources().getColor(id, context.getTheme()); } catch (Exception e) { return null; }
+                try { return context.getResources().getColor(id, context.getTheme()); } catch (android.content.res.Resources.NotFoundException e) { return null; }
             }
             // 3. Framework
             id = context.getResources().getIdentifier(name, "color", "android");
             if (id != 0) {
-                try { return context.getResources().getColor(id, context.getTheme()); } catch (Exception e) { return null; }
+                try { return context.getResources().getColor(id, context.getTheme()); } catch (android.content.res.Resources.NotFoundException e) { return null; }
             }
         } else if (ref.startsWith("@android:color/")) {
             String name = ref.substring("@android:color/".length());
             int id = context.getResources().getIdentifier(name, "color", "android");
             if (id != 0) {
-                try { return context.getResources().getColor(id, context.getTheme()); } catch (Exception e) { return null; }
+                try { return context.getResources().getColor(id, context.getTheme()); } catch (android.content.res.Resources.NotFoundException e) { return null; }
             }
         }
         return null;
@@ -1771,7 +1788,7 @@ public final class AttributeApplier {
                 return value.data;
             }
             if (value.resourceId != 0) {
-                try { return context.getResources().getColor(value.resourceId, context.getTheme()); } catch (Exception e) { return null; }
+                try { return context.getResources().getColor(value.resourceId, context.getTheme()); } catch (android.content.res.Resources.NotFoundException e) { return null; }
             }
         }
         return null;
@@ -1835,7 +1852,7 @@ public final class AttributeApplier {
         if ("match_parent".equals(value) || "fill_parent".equals(value)) return ViewGroup.LayoutParams.MATCH_PARENT;
         if ("wrap_content".equals(value)) return ViewGroup.LayoutParams.WRAP_CONTENT;
         if (dimensionConverter != null) {
-            try { return dimensionConverter.toPixelsInt(value); } catch (Exception e) { return 0; }
+            try { return dimensionConverter.toPixelsInt(value); } catch (ResourceException e) { return 0; }
         }
         try { return Integer.parseInt(value.replaceAll("[^0-9-]", "")); } catch (NumberFormatException e) { return 0; }
     }

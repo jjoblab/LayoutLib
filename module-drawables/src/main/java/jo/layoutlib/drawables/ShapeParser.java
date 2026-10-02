@@ -1,5 +1,6 @@
 package jo.layoutlib.drawables;
 
+import android.util.Log;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 import org.xmlpull.v1.XmlPullParserFactory;
@@ -37,6 +38,9 @@ import jo.layoutlib.resources.ResourceException;
  * @since 1.0
  */
 public class ShapeParser {
+
+    /** Tag de journalisation. */
+    private static final String TAG = "ShapeParser";
 
     /** Convertisseur de dimensions pour parser les dp/sp/px. */
     private final DimensionConverter dimensionConverter;
@@ -174,7 +178,8 @@ public class ShapeParser {
         if (angle != null) {
             try {
                 config.setGradientAngle(Integer.parseInt(angle));
-            } catch (NumberFormatException ignored) {
+            } catch (NumberFormatException e) {
+                Log.w(TAG, "Valeur numérique de shape invalide, ignorée : " + e.getMessage());
             }
         }
         if (type != null) {
