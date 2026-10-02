@@ -44,6 +44,7 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-engine:5.10.2")
     testImplementation("org.assertj:assertj-core:3.26.0")
     testImplementation("net.sf.kxml:kxml2:2.3.0")
+    testImplementation("org.mockito:mockito-core:5.14.2")
 
     // Tests instrumentés Android
     androidTestImplementation("androidx.test.ext:junit:1.1.5")

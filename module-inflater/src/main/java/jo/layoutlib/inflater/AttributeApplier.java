@@ -76,8 +76,8 @@ public final class AttributeApplier {
     private static final String NS_APP = "http://schemas.android.com/apk/res-auto";
 
     private final Context context;
-    private final DimensionConverter dimensionConverter;
-    private final ResourceResolver resourceResolver;
+    private DimensionConverter dimensionConverter;
+    private ResourceResolver resourceResolver;
 
     public AttributeApplier(Context context, DimensionConverter converter) {
         this(context, converter, null);
@@ -88,6 +88,47 @@ public final class AttributeApplier {
         this.context = context;
         this.dimensionConverter = converter;
         this.resourceResolver = resolver;
+    }
+
+    /**
+     * Définit le résolveur de ressources utilisé pour les références
+     * {@code @color/}, {@code @string/}, {@code @dimen/}…
+     *
+     * <p>Permet de connecter (ou remplacer) le résolveur <em>après</em> la
+     * construction, pour que le câblage ne dépende pas de l ordre des appels
+     * des setters du {@link RenderService}.</p>
+     *
+     * @param resolver le résolveur, ou {@code null} pour revenir aux
+     *                 {@code Resources} natives
+     */
+    public void setResourceResolver(ResourceResolver resolver) {
+        this.resourceResolver = resolver;
+    }
+
+    /**
+     * @return le résolveur de ressources courant (peut être {@code null})
+     */
+    public ResourceResolver getResourceResolver() {
+        return resourceResolver;
+    }
+
+    /**
+     * Remplace le convertisseur de dimensions.
+     *
+     * @param converter le nouveau convertisseur (si {@code null}, l ancien
+     *                  est conservé)
+     */
+    public void setDimensionConverter(DimensionConverter converter) {
+        if (converter != null) {
+            this.dimensionConverter = converter;
+        }
+    }
+
+    /**
+     * @return le convertisseur de dimensions courant
+     */
+    public DimensionConverter getDimensionConverter() {
+        return dimensionConverter;
     }
 
     /**
@@ -1374,7 +1415,7 @@ public final class AttributeApplier {
      * @param ref la référence (ex. @color/primary)
      * @return la couleur ARGB, ou null
      */
-    private Integer resolveColor(String ref) {
+    Integer resolveColor(String ref) {
         if (ref == null) return null;
         // 1. Tenter via ResourceResolver (project resources)
         if (resourceResolver != null) {
@@ -1433,7 +1474,7 @@ public final class AttributeApplier {
      * @param ref la référence
      * @return la chaîne, ou null
      */
-    private String resolveString(String ref) {
+    String resolveString(String ref) {
         if (ref == null) return null;
         if (resourceResolver != null) {
             String s = resourceResolver.getString(ref);
@@ -1459,7 +1500,7 @@ public final class AttributeApplier {
      * @param ref la référence
      * @return la valeur en pixels, ou null
      */
-    private Integer resolveDimension(String ref) {
+    Integer resolveDimension(String ref) {
         if (ref == null) return null;
         if (resourceResolver != null) {
             Float dim = resourceResolver.getDimension(ref);

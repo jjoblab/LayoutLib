@@ -65,6 +65,12 @@ public class RenderService {
     private boolean rendering = false;
     private boolean reRenderRequested = false;
 
+    /** Convertisseur de dimensions courant (gardé pour reconstruire l'applier). */
+    private DimensionConverter dimensionConverter;
+
+    /** Résolveur de ressources courant (gardé pour reconstruire l'applier). */
+    private ResourceResolver resourceResolver;
+
     /** Indique si au moins un rendu réussi a été fait (pour garder le dernier valide). */
     private boolean hasValidRender = false;
 
@@ -106,18 +112,65 @@ public class RenderService {
         layoutEngine.setDensity(density);
         layoutEngine.setFontScale(fontScale);
 
-        AttributeApplier applier = new AttributeApplier(context,
-                new DimensionConverter(density, fontScale, xdpi));
-        inflater.setAttributeApplier(applier);
+        this.dimensionConverter =
+                new DimensionConverter(density, fontScale, xdpi);
+        rebuildAttributeApplier();
     }
 
+    /**
+     * Définit le résolveur de ressources du pipeline de rendu.
+     *
+     * <p>Le résolveur est propagé au {@link BridgeInflater} (pour les
+     * {@code <include>} et références de layout) <em>et</em> à
+     * l'{@link AttributeApplier}, afin que {@code @color/}, {@code @string/}
+     * et {@code @dimen/} soient résolus par le résolveur quel que soit l ordre
+     * des appels {@code setDimensionConverter()} / {@code setResourceResolver()}.</p>
+     *
+     * @param resolver le résolveur, ou {@code null} pour revenir aux
+     *                 {@code Resources} natives
+     */
     public void setResourceResolver(ResourceResolver resolver) {
+        this.resourceResolver = resolver;
         inflater.setResourceResolver(resolver);
+        rebuildAttributeApplier();
     }
 
+    /**
+     * @return le résolveur de ressources courant (peut être {@code null})
+     */
+    public ResourceResolver getResourceResolver() {
+        return resourceResolver;
+    }
+
+    /**
+     * Remplace le convertisseur de dimensions utilisé par l'applier.
+     *
+     * <p>L'{@link AttributeApplier} est reconstruit avec le convertisseur
+     * fourni <em>et</em> le résolveur courant : le résultat est indépendant de
+     * l ordre des appels {@code setDimensionConverter()} /
+     * {@code setResourceResolver()}.</p>
+     *
+     * @param converter le nouveau convertisseur
+     */
     public void setDimensionConverter(DimensionConverter converter) {
-        AttributeApplier applier = new AttributeApplier(context, converter,
-                inflater.getResourceResolver());
+        this.dimensionConverter = converter;
+        rebuildAttributeApplier();
+    }
+
+    /**
+     * @return le convertisseur de dimensions courant
+     */
+    public DimensionConverter getDimensionConverter() {
+        return dimensionConverter;
+    }
+
+    /**
+     * Reconstruit l'{@link AttributeApplier} avec le convertisseur et le
+     * résolveur courants, et l installe dans le inflater.
+     */
+    private void rebuildAttributeApplier() {
+        AttributeApplier applier = new AttributeApplier(context,
+                dimensionConverter, resourceResolver);
         inflater.setAttributeApplier(applier);
     }
 

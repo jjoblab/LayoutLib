@@ -117,10 +117,18 @@ public class BridgeInflater {
      * {@code <include layout="@layout/foo" />} et les références
      * {@code @color/}, {@code @string/}, etc.
      *
+     * <p>Le résolveur est également propagé à l'{@link AttributeApplier}
+     * courant (s il existe), afin que la résolution des attributs
+     * {@code @color/}/{@code @string/}/{@code @dimen/} ne dépende pas de
+     * l ordre d appel des setters.</p>
+     *
      * @param resolver le résolveur, ou {@code null} pour désactiver la résolution
      */
     public void setResourceResolver(ResourceResolver resolver) {
         this.resourceResolver = resolver;
+        if (attributeApplier != null) {
+            attributeApplier.setResourceResolver(resolver);
+        }
     }
 
     /**
@@ -137,6 +145,13 @@ public class BridgeInflater {
      */
     public void setAttributeApplier(AttributeApplier applier) {
         this.attributeApplier = applier;
+    }
+
+    /**
+     * @return l'AttributeApplier courant (peut être {@code null})
+     */
+    public AttributeApplier getAttributeApplier() {
+        return attributeApplier;
     }
 
     /**
