@@ -13,6 +13,7 @@ import org.xmlpull.v1.XmlPullParserFactory;
 import java.io.IOException;
 import java.io.StringReader;
 
+import jo.layoutlib.drawables.DrawableResolver;
 import jo.layoutlib.inflater.bridge.util.Debug;
 import jo.layoutlib.layout.LayoutEngineImpl;
 import jo.layoutlib.resources.DimensionConverter;
@@ -80,6 +81,9 @@ public class RenderService {
 
     /** Résolveur de ressources courant (gardé pour reconstruire l'applier). */
     private ResourceResolver resourceResolver;
+
+    /** Résolveur de drawables courant (gardé pour reconstruire l'applier). */
+    private DrawableResolver drawableResolver;
 
     /** Indique si au moins un rendu réussi a été fait (pour garder le dernier valide). */
     private boolean hasValidRender = false;
@@ -191,12 +195,39 @@ public class RenderService {
     }
 
     /**
+     * Définit le résolveur de drawables du pipeline de rendu
+     * ({@code @drawable/} : shapes, selectors, vectors).
+     *
+     * <p>Propagé à l'{@link AttributeApplier} courant — quel que soit l'ordre
+     * des appels des autres setters.</p>
+     *
+     * @param drawableResolver le résolveur, ou {@code null} pour revenir aux
+     *                         {@code Resources} natives uniquement
+     */
+    public void setDrawableResolver(DrawableResolver drawableResolver) {
+        ensureNotReleased();
+        this.drawableResolver = drawableResolver;
+        AttributeApplier applier = inflater.getAttributeApplier();
+        if (applier != null) {
+            applier.setDrawableResolver(drawableResolver);
+        }
+    }
+
+    /**
+     * @return le résolveur de drawables courant (peut être {@code null})
+     */
+    public DrawableResolver getDrawableResolver() {
+        return drawableResolver;
+    }
+
+    /**
      * Reconstruit l'{@link AttributeApplier} avec le convertisseur et le
      * résolveur courants, et l installe dans le inflater.
      */
     private void rebuildAttributeApplier() {
         AttributeApplier applier = new AttributeApplier(context,
                 dimensionConverter, resourceResolver);
+        applier.setDrawableResolver(drawableResolver);
         inflater.setAttributeApplier(applier);
     }
 

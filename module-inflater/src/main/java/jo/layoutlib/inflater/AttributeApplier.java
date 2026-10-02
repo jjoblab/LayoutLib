@@ -52,6 +52,8 @@ import android.widget.ZoomButton;
 
 import org.xmlpull.v1.XmlPullParser;
 
+import jo.layoutlib.drawables.DrawableResolver;
+import jo.layoutlib.inflater.bridge.util.Debug;
 import jo.layoutlib.resources.ColorParser;
 import jo.layoutlib.resources.DimensionConverter;
 import jo.layoutlib.resources.ResourceException;
@@ -65,7 +67,10 @@ import jo.layoutlib.resources.ResourceResolver;
  * {@code XmlPullParser} et les applique via les setters natifs des vues.</p>
  *
  * <p>Supporte la résolution de références {@code @color/}, {@code @string/},
- * {@code @dimen/} et {@code ?attr/} via un {@link ResourceResolver} connecté.</p>
+ * {@code @dimen/}, {@code @array/} et {@code ?attr/} via un
+ * {@link ResourceResolver} connecté, et {@code @drawable/} via un
+ * {@link DrawableResolver} connecté (shapes, selectors, vectors) avec
+ * repli sur les {@code Resources} natives.</p>
  *
  * @author jo@Dev
  * @since 1.0
@@ -78,6 +83,7 @@ public final class AttributeApplier {
     private final Context context;
     private DimensionConverter dimensionConverter;
     private ResourceResolver resourceResolver;
+    private DrawableResolver drawableResolver;
 
     public AttributeApplier(Context context, DimensionConverter converter) {
         this(context, converter, null);
@@ -129,6 +135,27 @@ public final class AttributeApplier {
      */
     public DimensionConverter getDimensionConverter() {
         return dimensionConverter;
+    }
+
+    /**
+     * Définit le résolveur de drawables utilisé pour les références
+     * {@code @drawable/} (shapes, selectors, vectors du projet).
+     *
+     * <p>Sans résolveur (ou si le résolveur échoue), la résolution retombe
+     * sur les {@code Resources} natives.</p>
+     *
+     * @param drawableResolver le résolveur, ou {@code null} pour revenir aux
+     *                         {@code Resources} natives uniquement
+     */
+    public void setDrawableResolver(DrawableResolver drawableResolver) {
+        this.drawableResolver = drawableResolver;
+    }
+
+    /**
+     * @return le résolveur de drawables courant (peut être {@code null})
+     */
+    public DrawableResolver getDrawableResolver() {
+        return drawableResolver;
     }
 
     /**
@@ -472,8 +499,18 @@ public final class AttributeApplier {
         String drawableTop = getAttr(parser, "drawableTop");
         String drawableRight = getAttr(parser, "drawableRight");
         String drawableBottom = getAttr(parser, "drawableBottom");
-        if (drawableLeft != null || drawableTop != null || drawableRight != null || drawableBottom != null) {
-            // Drawables nécessitent résolution de resource — TODO
+        if (drawableLeft != null || drawableTop != null || drawableRight != null
+                || drawableBottom != null) {
+            Drawable dLeft = drawableLeft != null ? resolveDrawable(drawableLeft) : null;
+            Drawable dTop = drawableTop != null ? resolveDrawable(drawableTop) : null;
+            Drawable dRight = drawableRight != null ? resolveDrawable(drawableRight) : null;
+            Drawable dBottom = drawableBottom != null ? resolveDrawable(drawableBottom) : null;
+            if (dLeft != null || dTop != null || dRight != null || dBottom != null) {
+                tv.setCompoundDrawablesWithIntrinsicBounds(dLeft, dTop, dRight, dBottom);
+            } else {
+                Debug.logWarning("drawables",
+                        "drawableLeft/Top/Right/Bottom non résolus — ignorés");
+            }
         }
 
         String drawablePadding = getAttr(parser, "drawablePadding");
@@ -596,13 +633,19 @@ public final class AttributeApplier {
         if (secondaryProgress != null) { try { pb.setSecondaryProgress(Integer.parseInt(secondaryProgress)); } catch (NumberFormatException ignored) {} }
 
         String progressDrawable = getAttr(parser, "progressDrawable");
-        // TODO: résoudre @drawable/
+        if (progressDrawable != null) {
+            Drawable pd = resolveDrawable(progressDrawable);
+            if (pd != null) pb.setProgressDrawable(pd);
+        }
 
         String indeterminate = getAttr(parser, "indeterminate");
         if (indeterminate != null) pb.setIndeterminate("true".equals(indeterminate));
 
         String indeterminateDrawable = getAttr(parser, "indeterminateDrawable");
-        // TODO: résoudre @drawable/
+        if (indeterminateDrawable != null) {
+            Drawable id = resolveDrawable(indeterminateDrawable);
+            if (id != null) pb.setIndeterminateDrawable(id);
+        }
 
         String progressTint = getAttr(parser, "progressTint");
         if (progressTint != null) { try { pb.setProgressTintList(android.content.res.ColorStateList.valueOf(ColorParser.parse(progressTint))); } catch (Exception ignored) {} }
@@ -616,7 +659,10 @@ public final class AttributeApplier {
 
     private void applySeekBarAttributes(AbsSeekBar sb, XmlPullParser parser) {
         String thumb = getAttr(parser, "thumb");
-        // TODO: résoudre @drawable/
+        if (thumb != null) {
+            Drawable thumbDrawable = resolveDrawable(thumb);
+            if (thumbDrawable != null) sb.setThumb(thumbDrawable);
+        }
 
         String splitTrack = getAttr(parser, "splitTrack");
         if (splitTrack != null) sb.setSplitTrack("true".equals(splitTrack));
@@ -648,7 +694,14 @@ public final class AttributeApplier {
         // Mode dialog vs dropdown — non géré en prévisualisation
 
         String prompt = getAttr(parser, "prompt");
-        // TODO: résoudre @string/
+        if (prompt != null) {
+            // Littéral ou @string/ — resolveString gère les deux
+            String promptText = resolveString(prompt);
+            if (promptText == null && !prompt.startsWith("@")) {
+                promptText = prompt;
+            }
+            if (promptText != null) sp.setPrompt(promptText);
+        }
     }
 
     // ========================================================================
@@ -657,10 +710,28 @@ public final class AttributeApplier {
 
     private void applyAdapterViewAttributes(AdapterView<?> av, XmlPullParser parser) {
         String entries = getAttr(parser, "entries");
-        // TODO: résoudre @array/ pour peupler
+        if (entries != null) {
+            java.util.List<String> items = resolveStringArray(entries);
+            if (items != null && !items.isEmpty()) {
+                android.widget.ArrayAdapter<String> adapter =
+                        new android.widget.ArrayAdapter<>(context,
+                                android.R.layout.simple_list_item_1, items);
+                if (av instanceof Spinner) {
+                    adapter.setDropDownViewResource(
+                            android.R.layout.simple_spinner_dropdown_item);
+                }
+                ((AdapterView) av).setAdapter(adapter);
+            } else {
+                Debug.logWarning("resources",
+                        "entries non résolu (" + entries + ") — liste vide");
+            }
+        }
 
         String divider = getAttr(parser, "divider");
-        // TODO: résoudre @drawable/
+        if (divider != null && av instanceof ListView) {
+            Drawable div = resolveDrawable(divider);
+            if (div != null) ((ListView) av).setDivider(div);
+        }
 
         String dividerHeight = getAttr(parser, "dividerHeight");
         if (dividerHeight != null && av instanceof ListView) {
@@ -742,7 +813,10 @@ public final class AttributeApplier {
         if (measureWithLargestChild != null) ll.setMeasureWithLargestChildEnabled("true".equals(measureWithLargestChild));
 
         String divider = getAttr(parser, "divider");
-        // TODO: résoudre @drawable/
+        if (divider != null) {
+            Drawable div = resolveDrawable(divider);
+            if (div != null) ll.setDividerDrawable(div);
+        }
 
         String showDividers = getAttr(parser, "showDividers");
         if (showDividers != null) {
@@ -762,7 +836,9 @@ public final class AttributeApplier {
         if (gravity != null) rl.setGravity(parseGravity(gravity));
 
         String ignoreGravity = getAttr(parser, "ignoreGravity");
-        // TODO: résoudre @id/
+        if (ignoreGravity != null) {
+            rl.setIgnoreGravity(resolveViewId(ignoreGravity));
+        }
     }
 
     private void applyFrameLayoutAttributes(FrameLayout fl, XmlPullParser parser) {
@@ -987,7 +1063,14 @@ public final class AttributeApplier {
                 }
             }
             String icon = getAppAttr(parser, "icon");
-            // TODO: résoudre @drawable/ pour icône
+            if (icon != null) {
+                // MaterialButton setIcon n existe pas sur Button standard :
+                // approximation preview — icône en drawable composé gauche.
+                Drawable iconDrawable = resolveDrawable(icon);
+                if (iconDrawable != null) {
+                    btn.setCompoundDrawablesWithIntrinsicBounds(iconDrawable, null, null, null);
+                }
+            }
             String iconTint = getAppAttr(parser, "iconTint");
             if (iconTint != null) {
                 // Pas de setCompoundDrawableTintList sur Button standard
@@ -1447,11 +1530,42 @@ public final class AttributeApplier {
     /**
      * Résout une référence @drawable/ en Drawable.
      *
-     * @param ref la référence
+     * <p>Ordre de résolution :</p>
+     * <ol>
+     *   <li>{@link DrawableResolver} connecté (resources du projet :
+     *       shapes, selectors, vectors, images)</li>
+     *   <li>{@code Resources} natives (drawables de l'app hôte et du
+     *       framework via {@code getIdentifier})</li>
+     * </ol>
+     *
+     * <p>Un drawable non résolvable retourne {@code null} : l'attribut est
+     * ignoré, le rendu continue (jamais d'exception qui casserait tout le
+     * rendu).</p>
+     *
+     * @param ref la référence (ex. @drawable/card_bg)
      * @return le Drawable, ou null
      */
-    private Drawable resolveDrawable(String ref) {
-        if (ref == null) return null;
+    Drawable resolveDrawable(String ref) {
+        if (ref == null || context == null) {
+            return null;
+        }
+        // 1. DrawableResolver du projet
+        if (drawableResolver != null) {
+            try {
+                Drawable d = drawableResolver.resolve(ref, context);
+                if (d != null) {
+                    return d;
+                }
+            } catch (RuntimeException e) {
+                Debug.logWarning("drawables",
+                        "DrawableResolver a échoué pour " + ref + " : " + e);
+            }
+        }
+        // 2. Resources natives
+        android.content.res.Resources res = context.getResources();
+        if (res == null) {
+            return null;
+        }
         String name = null;
         String pkg = context.getPackageName();
         if (ref.startsWith("@drawable/")) {
@@ -1461,9 +1575,61 @@ public final class AttributeApplier {
             pkg = "android";
         }
         if (name == null) return null;
-        int id = context.getResources().getIdentifier(name, "drawable", pkg);
-        if (id != 0) {
-            try { return context.getResources().getDrawable(id, context.getTheme()); } catch (Exception e) { return null; }
+        try {
+            int id = res.getIdentifier(name, "drawable", pkg);
+            if (id != 0) {
+                return res.getDrawable(id, context.getTheme());
+            }
+        } catch (RuntimeException e) {
+            Debug.logWarning("drawables",
+                    "Drawable natif introuvable : " + ref);
+        }
+        return null;
+    }
+
+    /**
+     * Résout une référence @array/ en liste de chaînes.
+     *
+     * <p>Ordre de résolution :</p>
+     * <ol>
+     *   <li>{@link ResourceResolver} connecté (string-arrays du projet)</li>
+     *   <li>{@code Resources} natives via {@code getIdentifier(name, "array", pkg)}</li>
+     * </ol>
+     *
+     * @param ref la référence (ex. @array/planets)
+     * @return la liste résolue, ou null si introuvable
+     */
+    java.util.List<String> resolveStringArray(String ref) {
+        if (ref == null || !ref.startsWith("@array/") || context == null) {
+            return null;
+        }
+        String name = ref.substring("@array/".length());
+        // 1. ResourceResolver du projet
+        if (resourceResolver != null) {
+            java.util.List<String> array = resourceResolver.getStringArray(ref);
+            if (array != null) {
+                return array;
+            }
+        }
+        // 2. Resources natives
+        android.content.res.Resources res = context.getResources();
+        if (res == null) {
+            return null;
+        }
+        try {
+            int id = res.getIdentifier(name, "array", context.getPackageName());
+            if (id == 0) {
+                id = res.getIdentifier(name, "array", "android");
+            }
+            if (id != 0) {
+                String[] values = res.getStringArray(id);
+                if (values != null) {
+                    return java.util.Arrays.asList(values);
+                }
+            }
+        } catch (RuntimeException e) {
+            Debug.logWarning("resources",
+                    "string-array natif introuvable : " + ref);
         }
         return null;
     }

@@ -28,6 +28,7 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import jo.codeeditor.document.EditorDocument;
+import jo.layoutlib.drawables.DrawableResolverImpl;
 import jo.layoutlib.inflater.ComponentPalettePopup;
 import jo.layoutlib.inflater.DeviceProfile;
 import jo.layoutlib.inflater.OverlayView;
@@ -318,6 +319,12 @@ public class MainActivity extends AppCompatActivity {
         resourceResolver = new ResourceResolverImpl(table);
         resourceResolver.setDimensionConverter(new DimensionConverter(density, fontScale, xdpi));
         renderService.setResourceResolver(resourceResolver);
+
+        // ═══ DrawableResolver — shapes, selectors, vectors @drawable/ ═══
+        // (repli sur les Resources natives si la résolution échoue)
+        renderService.setDrawableResolver(
+                new DrawableResolverImpl(resourceResolver,
+                        new DimensionConverter(density, fontScale, xdpi)));
 
         renderService.setRenderCallback(new RenderService.RenderCallback() {
             @Override

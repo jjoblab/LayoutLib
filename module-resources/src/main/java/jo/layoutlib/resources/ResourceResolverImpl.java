@@ -4,8 +4,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -90,6 +92,9 @@ public class ResourceResolverImpl implements ResourceResolver {
 
     /** Cache des résolutions de booléens. */
     private final ResourceCache<String, Boolean> boolCache = new ResourceCache<>();
+
+    /** Cache des résolutions de string-arrays (liste défensive, copiée au retour). */
+    private final ResourceCache<String, List<String>> stringArrayCache = new ResourceCache<>();
 
     /**
      * Construit un resolver lié à un dossier {@code res/}.
@@ -326,6 +331,46 @@ public class ResourceResolverImpl implements ResourceResolver {
     }
 
     @Override
+    public java.util.List<String> getStringArray(String reference) {
+        if (reference == null || reference.isEmpty()) {
+            return null;
+        }
+        List<String> cached = stringArrayCache.get(reference);
+        if (cached != null) {
+            return new ArrayList<>(cached);
+        }
+        List<String> result = resolveStringArrayChain(reference, 0);
+        if (result != null) {
+            stringArrayCache.put(reference, new ArrayList<>(result));
+        }
+        return result;
+    }
+
+    /**
+     * Résout un string-array, avec résolution des {@code @string/} contenus
+     * dans les éléments.
+     */
+    private List<String> resolveStringArrayChain(String reference, int depth) {
+        if (depth > MAX_CHAIN_DEPTH || !reference.startsWith("@array/")) {
+            return null;
+        }
+        String name = reference.substring("@array/".length());
+        List<String> raw = table.getStringArray(name, currentQualifier);
+        if (raw == null) {
+            return null;
+        }
+        List<String> resolved = new ArrayList<>(raw.size());
+        for (String item : raw) {
+            if (item != null && item.startsWith("@string/")) {
+                resolved.add(resolveStringChain(item, depth + 1));
+            } else {
+                resolved.add(item);
+            }
+        }
+        return resolved;
+    }
+
+    @Override
     public Integer getInteger(String reference) {
         if (reference == null || reference.isEmpty()) {
             return null;
@@ -530,5 +575,6 @@ public class ResourceResolverImpl implements ResourceResolver {
         dimenCache.clear();
         integerCache.clear();
         boolCache.clear();
+        stringArrayCache.clear();
     }
 }

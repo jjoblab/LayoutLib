@@ -33,6 +33,8 @@ dependencies {
     api(project(":module-resources"))
     api(project(":module-attributes"))
     api(project(":module-layout"))
+    // Drawables : AttributeApplier expose DrawableResolver dans son API publique
+    api(project(":module-drawables"))
 
     // AndroidX core
     implementation("androidx.core:core:1.13.1")

@@ -12,6 +12,7 @@ package jo.layoutlib.resources;
  *   <li>{@code @dimen/foo} → valeur flottante en pixels</li>
  *   <li>{@code @integer/foo} → valeur entière</li>
  *   <li>{@code @bool/foo} → booléen</li>
+ *   <li>{@code @array/foo} → liste de chaînes ({@code <string-array>})</li>
  *   <li>{@code @layout/foo} → contenu XML du layout</li>
  *   <li>{@code @drawable/foo} → chemin vers le fichier drawable (XML ou image)</li>
  * </ul>
@@ -71,6 +72,18 @@ public interface ResourceResolver {
      * @return la valeur, ou {@code null} si introuvable
      */
     Boolean getBoolean(String reference);
+
+    /**
+     * Résout une référence de string-array {@code @array/foo}.
+     *
+     * <p>Les éléments de l'array peuvent eux-mêmes être des références
+     * {@code @string/} ; elles sont résolues récursivement.</p>
+     *
+     * @param reference la référence (ex. {@code @array/planets})
+     * @return une nouvelle liste des éléments résolus, ou {@code null} si
+     *         introuvable
+     */
+    java.util.List<String> getStringArray(String reference);
 
     /**
      * Récupère le contenu XML d'un layout référencé par {@code @layout/foo}.
