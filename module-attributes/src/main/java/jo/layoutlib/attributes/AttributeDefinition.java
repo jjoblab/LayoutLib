@@ -1,5 +1,6 @@
 package jo.layoutlib.attributes;
 
+import jo.layoutlib.resources.api.AttributeFormat;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;

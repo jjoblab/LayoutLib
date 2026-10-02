@@ -4,7 +4,7 @@
 >
 > **Auteur :** `jo@Dev` (toutes les Javadoc)
 > **Langue des Javadoc :** Français
-> **Version :** 2.0.0 — Alignée sur l'architecture AOSP layoutlib (416 classes)
+> **Version :** 2.1.0 — Alignée sur l'architecture AOSP layoutlib
 > **Cible :** Android minSdk 24, compileSdk 34, Java 11
 > **Référence AOSP :** https://android.googlesource.com/platform/frameworks/layoutlib
 
@@ -18,12 +18,12 @@ Android Studio utilise `layoutlib` (~85 000 lignes, ~400 classes) pour afficher 
 
 ```
 LayoutLib/
-├── module-inflater/          ← Module 1 : XML parser → View tree          ✅ Livré
-├── module-resources/         ← Module 2 : @color/, @string/, @dimen/      ✅ Livré
-├── module-drawables/         ← Module 3 : <shape>, <selector>, <vector>   ✅ Livré
-├── module-themes/            ← Module 4 : themes.xml, ?attr/              ✅ Livré
-├── module-attributes/        ← Module 5 : <declare-styleable>, app:*      ✅ Livré
-├── module-layout/            ← Module 6 : measure/layout engine           ✅ Livré
+├── module-inflater/          ← Module 1 : XML parser → View tree          ✅ Intégré au pipeline
+├── module-resources/         ← Module 2 : @color/, @string/, @dimen/      ✅ Intégré au pipeline
+├── module-drawables/         ← Module 3 : <shape>, <selector>, <vector>   ✅ Intégré au pipeline
+├── module-themes/            ← Module 4 : themes.xml, ?attr/              ✅ Intégré au pipeline
+├── module-attributes/        ← Module 5 : <declare-styleable>, app:*      ✅ Intégré (mode strict)
+├── module-layout/            ← Module 6 : measure/layout engine           ✅ Intégré au pipeline
 ├── validation/               ← Tests de comparaison avec layoutlib        ✅ Livré
 └── layout-editor-app/        ← App d'édition visuelle de layouts (jo.layoutlib.editor)
 ```
@@ -32,20 +32,24 @@ Package principal : `jo.layoutlib` (un sous-package par module : `jo.layoutlib.i
 
 ## Statut de la livraison
 
-| Module | Statut | Classes | Inspiré de l'AOSP |
-|--------|--------|---------|-------------------|
-| Module 1 — Inflater | ✅ Livré | 87 classes | bridge/impl, bridge/android, bridge/util, bridge/bars, bridge/binding, bridge/view |
-| Module 2 — Resources | ✅ Livré | 105 classes | layoutlib-api (ResourceValue, ResourceNamespace, RenderResources) |
-| Module 3 — Drawables | ✅ Livré | 78 classes | drawable delegates (AdaptiveIconDrawable_Delegate, NinePatchDrawable_Delegate, etc.) |
-| Module 4 — Themes | ✅ Livré | 48 classes | StyleResourceValue, AttrResourceValue, RenderResources |
-| Module 5 — Attributes | ✅ Livré | 48 classes | AttributeFormat, AttrResourceValueImpl |
-| Module 6 — Layout | ✅ Livré | 39 classes | RenderSessionImpl, Cassowary solver |
-| Validation | ✅ Livré | 11 classes | LayoutTestHarness (50 layouts) |
-| **Total** | | **416 classes** | **21 715 lignes** |
+« Intégré » = le module est branché sur le pipeline de rendu de
+`RenderService` (`layout-editor-app` le câble réellement) :
+
+| Module | Statut | Classes | Integration dans le pipeline |
+|--------|--------|---------|------------------------------|
+| Module 1 — Inflater | ✅ Intégré | 90 classes | Cœur du pipeline (`RenderService`, `BridgeInflater`, `AttributeApplier`) |
+| Module 2 — Resources | ✅ Intégré | 96 classes | `ResourceResolver` consulté pour `@color/`, `@string/`, `@dimen/`, `@array/` |
+| Module 3 — Drawables | ✅ Intégré | 74 classes | `DrawableResolver` consulté pour `@drawable/` (shapes, selectors, vectors) |
+| Module 4 — Themes | ✅ Intégré | 34 classes | `ThemeResolver` consulté pour `?attr/` (repli sur le thème natif) |
+| Module 5 — Attributes | ✅ Intégré | 41 classes | `AttributeRegistry` pilote le mode strict du `BridgeInflater` |
+| Module 6 — Layout | ✅ Intégré | 42 classes | `LayoutEngineImpl` fait la mesure + le layout de chaque rendu |
+| Validation | ✅ Livré | 7 classes | Hors pipeline : catalogue de 50 layouts de comparaison |
+| layout-editor-app | ✅ Livré | 9 classes | Consomme l'ensemble (app d'édition visuelle) |
+| **Total** | | **393 classes** | **~33 000 lignes** (main) |
 
 **Référence AOSP consultée :** https://android.googlesource.com/platform/frameworks/layoutlib (327 fichiers, 43 597 lignes) + tools/base/layoutlib-api (77 fichiers, 9 108 lignes)
 
-**Total tests : 323 cas** (240 JVM + 51 instrumentés + 32 validation)
+**Tests : 408 unitaires JVM** (`./gradlew testAllModules`) **+ tests instrumentés** (`connectedAndroidTest`, catalogue de 50 layouts, cf. `validation/`).
 
 ## Démarrage rapide
 

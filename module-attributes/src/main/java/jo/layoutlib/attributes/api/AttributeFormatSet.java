@@ -1,9 +1,9 @@
 package jo.layoutlib.attributes.api;
 
+import jo.layoutlib.resources.api.AttributeFormat;
 import java.util.EnumSet;
 import java.util.Set;
 
-import jo.layoutlib.attributes.AttributeFormat;
 
 /**
  * Set de formats d attribut, inspiré de l AOSP.

@@ -18,6 +18,7 @@ import jo.layoutlib.inflater.bridge.util.Debug;
 import jo.layoutlib.layout.LayoutEngineImpl;
 import jo.layoutlib.resources.DimensionConverter;
 import jo.layoutlib.resources.ResourceResolver;
+import jo.layoutlib.themes.ThemeResolver;
 
 /**
  * Service de rendu asynchrone avec debounce, inspiré du
@@ -84,6 +85,9 @@ public class RenderService {
 
     /** Résolveur de drawables courant (gardé pour reconstruire l'applier). */
     private DrawableResolver drawableResolver;
+
+    /** Résolveur de thèmes courant (gardé pour reconstruire l'applier). */
+    private ThemeResolver themeResolver;
 
     /** Indique si au moins un rendu réussi a été fait (pour garder le dernier valide). */
     private boolean hasValidRender = false;
@@ -221,6 +225,34 @@ public class RenderService {
     }
 
     /**
+     * Définit le résolveur de thèmes du pipeline de rendu (module-themes) :
+     * résolution {@code ?attr/} et {@code ?android:attr/} depuis les
+     * themes.xml/styles.xml du projet.
+     *
+     * <p>Propagé à l'{@link AttributeApplier} courant ; en cas de rebuild de
+     * l'applier (setDimensionConverter/setResourceResolver), il est
+     * conservé.</p>
+     *
+     * @param themeResolver le résolveur, ou {@code null} pour revenir au
+     *                      thème natif uniquement
+     */
+    public void setThemeResolver(ThemeResolver themeResolver) {
+        ensureNotReleased();
+        this.themeResolver = themeResolver;
+        AttributeApplier applier = inflater.getAttributeApplier();
+        if (applier != null) {
+            applier.setThemeResolver(themeResolver);
+        }
+    }
+
+    /**
+     * @return le résolveur de thèmes courant (peut être {@code null})
+     */
+    public ThemeResolver getThemeResolver() {
+        return themeResolver;
+    }
+
+    /**
      * Reconstruit l'{@link AttributeApplier} avec le convertisseur et le
      * résolveur courants, et l installe dans le inflater.
      */
@@ -228,6 +260,7 @@ public class RenderService {
         AttributeApplier applier = new AttributeApplier(context,
                 dimensionConverter, resourceResolver);
         applier.setDrawableResolver(drawableResolver);
+        applier.setThemeResolver(themeResolver);
         inflater.setAttributeApplier(applier);
     }
 

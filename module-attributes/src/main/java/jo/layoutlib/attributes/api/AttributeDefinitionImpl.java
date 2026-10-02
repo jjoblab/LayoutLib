@@ -1,9 +1,9 @@
 package jo.layoutlib.attributes.api;
 
+import jo.layoutlib.resources.api.AttributeFormat;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import jo.layoutlib.attributes.AttributeFormat;
 
 /**
  * Implémentation de AttributeDefinition, inspiré de l AOSP.

@@ -88,6 +88,9 @@ public class BridgeInflater {
     /** Indique si le inflater doit lever une exception sur les attributs inconnus. */
     private boolean strictMode = false;
 
+    /** Registre d'attributs (module-attributes) pour le mode strict. */
+    private jo.layoutlib.attributes.AttributeRegistry attributeRegistry;
+
     /**
      * Construit un inflater par défaut avec les classes Design préférées.
      *
@@ -165,6 +168,55 @@ public class BridgeInflater {
      */
     public void setStrictMode(boolean strict) {
         this.strictMode = strict;
+    }
+
+    /**
+     * Définit le registre d'attributs utilisé par le mode strict
+     * (intégration du module-attributes).
+     *
+     * <p>En mode strict, chaque attribut {@code android:*}/{@code app:*} du
+     * layout est vérifié contre ce registre : un attribut inconnu lève une
+     * {@link InflateException}. Sans registre, le mode strict garde son
+     * comportement historique (vérifications ponctuelles).</p>
+     *
+     * @param attributeRegistry le registre (ex. {@code CompositeAttributeRegistry}
+     *                           combinant framework + Material + AndroidX),
+     *                           ou {@code null} pour désactiver
+     */
+    public void setAttributeRegistry(jo.layoutlib.attributes.AttributeRegistry attributeRegistry) {
+        this.attributeRegistry = attributeRegistry;
+    }
+
+    /**
+     * @return le registre d'attributs du mode strict (peut être {@code null})
+     */
+    public jo.layoutlib.attributes.AttributeRegistry getAttributeRegistry() {
+        return attributeRegistry;
+    }
+
+    /**
+     * Vérifie les attributs du START_TAG courant contre le registre
+     * (mode strict uniquement).
+     *
+     * <p>Visibilité package : testable unitairement.</p>
+     *
+     * @throws InflateException si un attribut est inconnu du registre
+     */
+    void checkKnownAttributes(XmlPullParser parser) {
+        if (!strictMode || attributeRegistry == null) {
+            return;
+        }
+        for (int i = 0; i < parser.getAttributeCount(); i++) {
+            String name = parser.getAttributeName(i);
+            if (name == null || name.isEmpty()) {
+                continue;
+            }
+            if (!attributeRegistry.isKnownAttribute(name)) {
+                throw new InflateException(
+                        "Attribut inconnu en mode strict : '" + name
+                                + "' (non déclaré dans le registre d'attributs)");
+            }
+        }
     }
 
     /**
@@ -265,6 +317,10 @@ public class BridgeInflater {
         // car XmlPullAttributes ne peut pas être casté en XmlBlock.Parser sur Android 14+
         // Les attributs sont appliqués manuellement via AttributeApplier
         View view = viewFactory.createView(tag);
+
+        // Mode strict + registre d'attributs (module-attributes) :
+        // tout attribut android:/app: inconnu du registre lève avant application
+        checkKnownAttributes(parser);
 
         // Appliquer tous les attributs XML via les setters natifs
         if (attributeApplier != null) {

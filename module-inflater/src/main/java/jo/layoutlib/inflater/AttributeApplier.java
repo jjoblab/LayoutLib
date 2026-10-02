@@ -58,6 +58,7 @@ import jo.layoutlib.resources.ColorParser;
 import jo.layoutlib.resources.DimensionConverter;
 import jo.layoutlib.resources.ResourceException;
 import jo.layoutlib.resources.ResourceResolver;
+import jo.layoutlib.themes.ThemeResolver;
 
 /**
  * Applique les attributs XML aux vues via leurs setters natifs.
@@ -84,6 +85,7 @@ public final class AttributeApplier {
     private DimensionConverter dimensionConverter;
     private ResourceResolver resourceResolver;
     private DrawableResolver drawableResolver;
+    private ThemeResolver themeResolver;
 
     public AttributeApplier(Context context, DimensionConverter converter) {
         this(context, converter, null);
@@ -156,6 +158,27 @@ public final class AttributeApplier {
      */
     public DrawableResolver getDrawableResolver() {
         return drawableResolver;
+    }
+
+    /**
+     * Définit le résolveur de thèmes utilisé pour les références
+     * {@code ?attr/} et {@code ?android:attr/} (module-themes).
+     *
+     * <p>Sans résolveur (ou si le thème ne définit pas l'attribut), la
+     * résolution retombe sur le {@code Resources.Theme} natif.</p>
+     *
+     * @param themeResolver le résolveur, ou {@code null} pour revenir au
+     *                      thème natif uniquement
+     */
+    public void setThemeResolver(ThemeResolver themeResolver) {
+        this.themeResolver = themeResolver;
+    }
+
+    /**
+     * @return le résolveur de thèmes courant (peut être {@code null})
+     */
+    public ThemeResolver getThemeResolver() {
+        return themeResolver;
     }
 
     /**
@@ -1685,11 +1708,33 @@ public final class AttributeApplier {
     /**
      * Résout un attribut de thème ?attr/ ou ?android:attr/.
      *
+     * <p>Ordre de résolution :</p>
+     * <ol>
+     *   <li>{@link ThemeResolver} connecté (module-themes : thèmes/styles du
+     *       projet parsés depuis themes.xml/styles.xml)</li>
+     *   <li>{@code Resources.Theme} natif</li>
+     * </ol>
+     *
+     * <p>Visibilité package : testable unitairement.</p>
+     *
      * @param ref la référence
      * @return la couleur ARGB, ou null
      */
-    private Integer resolveThemeAttr(String ref) {
+    Integer resolveThemeAttr(String ref) {
         if (ref == null) return null;
+        // 1. ThemeResolver du projet (themes.xml/styles.xml)
+        if (themeResolver != null) {
+            try {
+                Object value = themeResolver.resolveAttr(ref);
+                if (value instanceof Integer) {
+                    return (Integer) value;
+                }
+            } catch (RuntimeException e) {
+                Debug.logWarning("themes",
+                        "ThemeResolver a échoué pour " + ref + " : " + e);
+            }
+        }
+        // 2. Résoudre via Resources.Theme natif
         String attrName;
         boolean framework;
         if (ref.startsWith("?android:attr/")) {
@@ -1704,7 +1749,10 @@ public final class AttributeApplier {
         } else {
             return null;
         }
-        // Résoudre via Resources.Theme natif
+        // Résoudre via Resources.Theme natif (contexte absent/minimal → null)
+        if (context == null || context.getResources() == null) {
+            return null;
+        }
         int attrId;
         if (framework) {
             attrId = context.getResources().getIdentifier(attrName, "attr", "android");
@@ -1715,6 +1763,7 @@ public final class AttributeApplier {
             }
         }
         if (attrId == 0) return null;
+        if (context.getTheme() == null) return null;
         android.util.TypedValue value = new android.util.TypedValue();
         if (context.getTheme().resolveAttribute(attrId, value, true)) {
             if (value.type >= android.util.TypedValue.TYPE_FIRST_COLOR_INT

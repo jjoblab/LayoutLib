@@ -35,6 +35,7 @@ import jo.layoutlib.inflater.OverlayView;
 import jo.layoutlib.inflater.RenderService;
 import jo.layoutlib.inflater.ViewInfoCollector;
 import jo.layoutlib.inflater.BlueprintListView;
+import jo.layoutlib.themes.ThemeResolverImpl;
 import jo.layoutlib.resources.DimensionConverter;
 import jo.layoutlib.resources.ResourceResolverImpl;
 import jo.layoutlib.resources.ResourceTable;
@@ -68,6 +69,7 @@ public class MainActivity extends AppCompatActivity {
     // ---- Services du mini-layoutlib ----
     private RenderService renderService;
     private ResourceResolverImpl resourceResolver;
+    private ThemeResolverImpl themeResolver;
     private OverlayView overlayView;
 
     // ---- code-editor-lib ----
@@ -325,6 +327,13 @@ public class MainActivity extends AppCompatActivity {
         renderService.setDrawableResolver(
                 new DrawableResolverImpl(resourceResolver,
                         new DimensionConverter(density, fontScale, xdpi)));
+
+        // ═══ ThemeResolver — ?attr/ depuis themes.xml/styles.xml ═══
+        // (repli sur le thème natif si l'attribut n'y est pas défini)
+        themeResolver = new ThemeResolverImpl(resourceResolver,
+                new DimensionConverter(density, fontScale, xdpi));
+        themeResolver.setTheme("Theme.MaterialComponents.DayNight");
+        renderService.setThemeResolver(themeResolver);
 
         renderService.setRenderCallback(new RenderService.RenderCallback() {
             @Override

@@ -1,5 +1,6 @@
 package jo.layoutlib.attributes;
 
+import jo.layoutlib.resources.api.AttributeFormat;
 import android.content.Context;
 import android.view.View;
 
