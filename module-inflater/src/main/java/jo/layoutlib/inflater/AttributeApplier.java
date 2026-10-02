@@ -81,11 +81,22 @@ public final class AttributeApplier {
     private static final String NS_ANDROID = "http://schemas.android.com/apk/res/android";
     private static final String NS_APP = "http://schemas.android.com/apk/res-auto";
 
-    private final Context context;
+    final Context context;
     private DimensionConverter dimensionConverter;
     private ResourceResolver resourceResolver;
     private DrawableResolver drawableResolver;
     private ThemeResolver themeResolver;
+
+    /** Applier TextFamilyAttributes. */
+    private final TextFamilyAttributes textFamilyAttributes = new TextFamilyAttributes(this);
+    /** Applier ProgressFamilyAttributes. */
+    private final ProgressFamilyAttributes progressFamilyAttributes = new ProgressFamilyAttributes(this);
+    /** Applier AdapterFamilyAttributes. */
+    private final AdapterFamilyAttributes adapterFamilyAttributes = new AdapterFamilyAttributes(this);
+    /** Applier LayoutFamilyAttributes. */
+    private final LayoutFamilyAttributes layoutFamilyAttributes = new LayoutFamilyAttributes(this);
+    /** Applier MiscWidgetAttributes. */
+    private final MiscWidgetAttributes miscWidgetAttributes = new MiscWidgetAttributes(this);
 
     public AttributeApplier(Context context, DimensionConverter converter) {
         this(context, converter, null);
@@ -189,87 +200,14 @@ public final class AttributeApplier {
 
         applyViewAttributes(view, parser);
 
-        // Hiérarchie: TextView → Button, EditText, CheckBox, etc.
-        if (view instanceof CompoundButton) {
-            applyCompoundButtonAttributes((CompoundButton) view, parser);
-        }
-        if (view instanceof TextView) {
-            applyTextViewAttributes((TextView) view, parser);
-        }
-        if (view instanceof EditText) {
-            applyEditTextAttributes((EditText) view, parser);
-        }
-        if (view instanceof ImageView) {
-            applyImageViewAttributes((ImageView) view, parser);
-        }
-        if (view instanceof ProgressBar) {
-            applyProgressBarAttributes((ProgressBar) view, parser);
-        }
-        if (view instanceof AbsSeekBar) {
-            applySeekBarAttributes((AbsSeekBar) view, parser);
-        }
-        if (view instanceof RatingBar) {
-            applyRatingBarAttributes((RatingBar) view, parser);
-        }
-        if (view instanceof Spinner) {
-            applySpinnerAttributes((Spinner) view, parser);
-        }
-        if (view instanceof AdapterView) {
-            applyAdapterViewAttributes((AdapterView) view, parser);
-        }
-        if (view instanceof LinearLayout) {
-            applyLinearLayoutAttributes((LinearLayout) view, parser);
-        }
-        if (view instanceof RelativeLayout) {
-            applyRelativeLayoutAttributes((RelativeLayout) view, parser);
-        }
-        if (view instanceof FrameLayout) {
-            applyFrameLayoutAttributes((FrameLayout) view, parser);
-        }
-        if (view instanceof GridLayout) {
-            applyGridLayoutAttributes((GridLayout) view, parser);
-        }
-        if (view instanceof TableLayout) {
-            applyTableLayoutAttributes((TableLayout) view, parser);
-        }
-        if (view instanceof TableRow) {
-            applyTableRowAttributes((TableRow) view, parser);
-        }
-        if (view instanceof ScrollView || view instanceof HorizontalScrollView) {
-            applyScrollViewAttributes((android.widget.ScrollView) view, parser);
-        }
-        if (view instanceof CalendarView) {
-            applyCalendarViewAttributes((CalendarView) view, parser);
-        }
-        if (view instanceof Chronometer) {
-            applyChronometerAttributes((Chronometer) view, parser);
-        }
-        if (view instanceof TextClock) {
-            applyTextClockAttributes((TextClock) view, parser);
-        }
-        if (view instanceof NumberPicker) {
-            applyNumberPickerAttributes((NumberPicker) view, parser);
-        }
-        if (view instanceof SearchView) {
-            applySearchViewAttributes((SearchView) view, parser);
-        }
-        if (view instanceof ViewAnimator) {
-            applyViewAnimatorAttributes((ViewAnimator) view, parser);
-        }
-        if (view instanceof DatePicker) {
-            applyDatePickerAttributes((DatePicker) view, parser);
-        }
-        if (view instanceof TimePicker) {
-            applyTimePickerAttributes((TimePicker) view, parser);
-        }
-        if (view instanceof GridView) {
-            applyGridViewAttributes((GridView) view, parser);
-        }
-        if (view instanceof ListView) {
-            applyListViewAttributes((ListView) view, parser);
-        }
+        // Familles de widgets (ordre identique à l ancienne chaîne instanceof)
+        textFamilyAttributes.apply(view, parser);
+        progressFamilyAttributes.apply(view, parser);
+        adapterFamilyAttributes.apply(view, parser);
+        layoutFamilyAttributes.apply(view, parser);
+        miscWidgetAttributes.apply(view, parser);
 
-        // Applique les attributs app: (Material Components, AndroidX)
+        // Attributs app: (Material Components, AndroidX)
         applyAppAttributes(view, parser);
     }
 
@@ -421,187 +359,8 @@ public final class AttributeApplier {
     // TextView (+ Button, EditText, CheckBox, etc.)
     // ========================================================================
 
-    private void applyTextViewAttributes(TextView tv, XmlPullParser parser) {
-        String text = getAttr(parser, "text");
-        if (text != null) {
-            if (text.startsWith("@string/")) {
-                String resolved = resolveString(text);
-                tv.setText(resolved != null ? resolved : text);
-            } else {
-                tv.setText(text);
-            }
-        }
 
-        String textColor = getAttr(parser, "textColor");
-        if (textColor != null) applyTextColor(tv, textColor);
 
-        String textSize = getAttr(parser, "textSize");
-        if (textSize != null) { try { tv.setTextSize(TypedValue.COMPLEX_UNIT_PX, parseDim(textSize)); } catch (RuntimeException e) { logAttrError("textSize", e); } }
-
-        String textStyle = getAttr(parser, "textStyle");
-        if (textStyle != null) {
-            int style = Typeface.NORMAL;
-            if (textStyle.contains("bold")) style |= Typeface.BOLD;
-            if (textStyle.contains("italic")) style |= Typeface.ITALIC;
-            tv.setTypeface(tv.getTypeface(), style);
-        }
-
-        String gravity = getAttr(parser, "gravity");
-        if (gravity != null) tv.setGravity(parseGravity(gravity));
-
-        String hint = getAttr(parser, "hint");
-        if (hint != null) tv.setHint(hint);
-
-        String textColorHint = getAttr(parser, "textColorHint");
-        if (textColorHint != null) { try { tv.setHintTextColor(ColorParser.parse(textColorHint)); } catch (RuntimeException e) { logAttrError("textColorHint", e); } }
-
-        String textAlignment = getAttr(parser, "textAlignment");
-        if (textAlignment != null) {
-            switch (textAlignment) {
-                case "center": tv.setTextAlignment(View.TEXT_ALIGNMENT_CENTER); break;
-                case "textStart": tv.setTextAlignment(View.TEXT_ALIGNMENT_TEXT_START); break;
-                case "textEnd": tv.setTextAlignment(View.TEXT_ALIGNMENT_TEXT_END); break;
-                case "viewStart": tv.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_START); break;
-                case "viewEnd": tv.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_END); break;
-                case "inherit": tv.setTextAlignment(View.TEXT_ALIGNMENT_INHERIT); break;
-            }
-        }
-
-        String maxLines = getAttr(parser, "maxLines");
-        if (maxLines != null) { try { tv.setMaxLines(Integer.parseInt(maxLines)); } catch (NumberFormatException e) { logAttrError("maxLines", e); } }
-
-        String minLines = getAttr(parser, "minLines");
-        if (minLines != null) { try { tv.setMinLines(Integer.parseInt(minLines)); } catch (NumberFormatException e) { logAttrError("minLines", e); } }
-
-        String lines = getAttr(parser, "lines");
-        if (lines != null) { try { tv.setLines(Integer.parseInt(lines)); } catch (NumberFormatException e) { logAttrError("lines", e); } }
-
-        String maxEms = getAttr(parser, "maxEms");
-        if (maxEms != null) { try { tv.setMaxEms(Integer.parseInt(maxEms)); } catch (NumberFormatException e) { logAttrError("maxEms", e); } }
-
-        String minEms = getAttr(parser, "minEms");
-        if (minEms != null) { try { tv.setMinEms(Integer.parseInt(minEms)); } catch (NumberFormatException e) { logAttrError("minEms", e); } }
-
-        String ems = getAttr(parser, "ems");
-        if (ems != null) { try { tv.setEms(Integer.parseInt(ems)); } catch (NumberFormatException e) { logAttrError("ems", e); } }
-
-        String ellipsize = getAttr(parser, "ellipsize");
-        if (ellipsize != null) {
-            switch (ellipsize) {
-                case "end": tv.setEllipsize(android.text.TextUtils.TruncateAt.END); break;
-                case "start": tv.setEllipsize(android.text.TextUtils.TruncateAt.START); break;
-                case "middle": tv.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE); break;
-                case "marquee": tv.setEllipsize(android.text.TextUtils.TruncateAt.MARQUEE); break;
-            }
-        }
-
-        String singleLine = getAttr(parser, "singleLine");
-        if (singleLine != null) tv.setSingleLine("true".equals(singleLine));
-
-        String maxWidth = getAttr(parser, "maxWidth");
-        if (maxWidth != null) tv.setMaxWidth(parseDim(maxWidth));
-
-        String minWidth = getAttr(parser, "minWidth");
-        if (minWidth != null) tv.setMinWidth(parseDim(minWidth));
-
-        String letterSpacing = getAttr(parser, "letterSpacing");
-        if (letterSpacing != null) { try { tv.setLetterSpacing(Float.parseFloat(letterSpacing)); } catch (NumberFormatException e) { logAttrError("letterSpacing", e); } }
-
-        String lineSpacingExtra = getAttr(parser, "lineSpacingExtra");
-        if (lineSpacingExtra != null) { try { tv.setLineSpacing(parseDim(lineSpacingExtra), 1f); } catch (RuntimeException e) { logAttrError("lineSpacingExtra", e); } }
-
-        String lineSpacingMultiplier = getAttr(parser, "lineSpacingMultiplier");
-        if (lineSpacingMultiplier != null) { try { tv.setLineSpacing(0f, Float.parseFloat(lineSpacingMultiplier)); } catch (NumberFormatException e) { logAttrError("lineSpacingMultiplier", e); } }
-
-        String textAllCaps = getAttr(parser, "textAllCaps");
-        if (textAllCaps != null) {
-            tv.setAllCaps("true".equals(textAllCaps));
-        }
-
-        String drawableLeft = getAttr(parser, "drawableLeft");
-        String drawableTop = getAttr(parser, "drawableTop");
-        String drawableRight = getAttr(parser, "drawableRight");
-        String drawableBottom = getAttr(parser, "drawableBottom");
-        if (drawableLeft != null || drawableTop != null || drawableRight != null
-                || drawableBottom != null) {
-            Drawable dLeft = drawableLeft != null ? resolveDrawable(drawableLeft) : null;
-            Drawable dTop = drawableTop != null ? resolveDrawable(drawableTop) : null;
-            Drawable dRight = drawableRight != null ? resolveDrawable(drawableRight) : null;
-            Drawable dBottom = drawableBottom != null ? resolveDrawable(drawableBottom) : null;
-            if (dLeft != null || dTop != null || dRight != null || dBottom != null) {
-                tv.setCompoundDrawablesWithIntrinsicBounds(dLeft, dTop, dRight, dBottom);
-            } else {
-                Debug.logWarning("drawables",
-                        "drawableLeft/Top/Right/Bottom non résolus — ignorés");
-            }
-        }
-
-        String drawablePadding = getAttr(parser, "drawablePadding");
-        if (drawablePadding != null) tv.setCompoundDrawablePadding(parseDim(drawablePadding));
-
-        String shadowColor = getAttr(parser, "shadowColor");
-        String shadowDx = getAttr(parser, "shadowDx");
-        String shadowDy = getAttr(parser, "shadowDy");
-        String shadowRadius = getAttr(parser, "shadowRadius");
-        if (shadowColor != null && shadowRadius != null) {
-            try {
-                tv.setShadowLayer(Float.parseFloat(shadowRadius),
-                        shadowDx != null ? Float.parseFloat(shadowDx) : 0,
-                        shadowDy != null ? Float.parseFloat(shadowDy) : 0,
-                        ColorParser.parse(shadowColor));
-            } catch (RuntimeException e) { logAttrError("shadowRadius", e); }
-        }
-
-        String fontFamily = getAttr(parser, "fontFamily");
-        if (fontFamily != null) {
-            Typeface tf = Typeface.create(fontFamily, Typeface.NORMAL);
-            tv.setTypeface(tf);
-        }
-
-        String includeFontPadding = getAttr(parser, "includeFontPadding");
-        if (includeFontPadding != null) tv.setIncludeFontPadding("true".equals(includeFontPadding));
-
-        String textIsSelectable = getAttr(parser, "textIsSelectable");
-        if (textIsSelectable != null) tv.setTextIsSelectable("true".equals(textIsSelectable));
-
-        String autoLink = getAttr(parser, "autoLink");
-        // autoLink nécessite Android text utils — non géré en prévisualisation
-    }
-
-    private void applyEditTextAttributes(EditText et, XmlPullParser parser) {
-        String inputType = getAttr(parser, "inputType");
-        if (inputType != null) et.setInputType(parseInputType(inputType));
-
-        String maxLength = getAttr(parser, "maxLength");
-        // maxLength nécessite InputFilter — non géré en prévisualisation
-
-        String imeOptions = getAttr(parser, "imeOptions");
-        if (imeOptions != null) {
-            int opts = 0;
-            if (imeOptions.contains("actionDone")) opts |= android.view.inputmethod.EditorInfo.IME_ACTION_DONE;
-            else if (imeOptions.contains("actionGo")) opts |= android.view.inputmethod.EditorInfo.IME_ACTION_GO;
-            else if (imeOptions.contains("actionNext")) opts |= android.view.inputmethod.EditorInfo.IME_ACTION_NEXT;
-            else if (imeOptions.contains("actionSearch")) opts |= android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH;
-            else if (imeOptions.contains("actionSend")) opts |= android.view.inputmethod.EditorInfo.IME_ACTION_SEND;
-            et.setImeOptions(opts);
-        }
-
-        String capitalize = getAttr(parser, "capitalize");
-        // Deprecated — non géré
-
-        String digits = getAttr(parser, "digits");
-        if (digits != null) et.setKeyListener(android.text.method.DigitsKeyListener.getInstance(digits));
-    }
-
-    private void applyCompoundButtonAttributes(CompoundButton cb, XmlPullParser parser) {
-        String checked = getAttr(parser, "checked");
-        if (checked != null) cb.setChecked("true".equals(checked));
-
-        String button = getAttr(parser, "button");
-        if (button != null) {
-            try { cb.setButtonDrawable(ColorParser.parse(button)); } catch (RuntimeException e) { logAttrError("button", e); }
-        }
-    }
 
     // ========================================================================
     // ImageView (+ ImageButton)
@@ -645,380 +404,43 @@ public final class AttributeApplier {
     // ProgressBar (+ SeekBar, RatingBar)
     // ========================================================================
 
-    private void applyProgressBarAttributes(ProgressBar pb, XmlPullParser parser) {
-        String max = getAttr(parser, "max");
-        if (max != null) { try { pb.setMax(Integer.parseInt(max)); } catch (NumberFormatException e) { logAttrError("max", e); } }
 
-        String progress = getAttr(parser, "progress");
-        if (progress != null) { try { pb.setProgress(Integer.parseInt(progress)); } catch (NumberFormatException e) { logAttrError("progress", e); } }
 
-        String secondaryProgress = getAttr(parser, "secondaryProgress");
-        if (secondaryProgress != null) { try { pb.setSecondaryProgress(Integer.parseInt(secondaryProgress)); } catch (NumberFormatException e) { logAttrError("secondaryProgress", e); } }
-
-        String progressDrawable = getAttr(parser, "progressDrawable");
-        if (progressDrawable != null) {
-            Drawable pd = resolveDrawable(progressDrawable);
-            if (pd != null) pb.setProgressDrawable(pd);
-        }
-
-        String indeterminate = getAttr(parser, "indeterminate");
-        if (indeterminate != null) pb.setIndeterminate("true".equals(indeterminate));
-
-        String indeterminateDrawable = getAttr(parser, "indeterminateDrawable");
-        if (indeterminateDrawable != null) {
-            Drawable id = resolveDrawable(indeterminateDrawable);
-            if (id != null) pb.setIndeterminateDrawable(id);
-        }
-
-        String progressTint = getAttr(parser, "progressTint");
-        if (progressTint != null) { try { pb.setProgressTintList(android.content.res.ColorStateList.valueOf(ColorParser.parse(progressTint))); } catch (RuntimeException e) { logAttrError("progressTint", e); } }
-
-        String min = getAttr(parser, "min");
-        // ProgressBar#setMin n existe qu à partir de l API 26 (minSdk = 24).
-        if (min != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            try { pb.setMin(Integer.parseInt(min)); } catch (NumberFormatException e) { logAttrError("min", e); }
-        }
-    }
-
-    private void applySeekBarAttributes(AbsSeekBar sb, XmlPullParser parser) {
-        String thumb = getAttr(parser, "thumb");
-        if (thumb != null) {
-            Drawable thumbDrawable = resolveDrawable(thumb);
-            if (thumbDrawable != null) sb.setThumb(thumbDrawable);
-        }
-
-        String splitTrack = getAttr(parser, "splitTrack");
-        if (splitTrack != null) sb.setSplitTrack("true".equals(splitTrack));
-
-        String thumbOffset = getAttr(parser, "thumbOffset");
-        if (thumbOffset != null) { try { sb.setThumbOffset(parseDim(thumbOffset)); } catch (RuntimeException e) { logAttrError("thumbOffset", e); } }
-    }
-
-    private void applyRatingBarAttributes(RatingBar rb, XmlPullParser parser) {
-        String numStars = getAttr(parser, "numStars");
-        if (numStars != null) { try { rb.setNumStars(Integer.parseInt(numStars)); } catch (NumberFormatException e) { logAttrError("numStars", e); } }
-
-        String rating = getAttr(parser, "rating");
-        if (rating != null) { try { rb.setRating(Float.parseFloat(rating)); } catch (NumberFormatException e) { logAttrError("rating", e); } }
-
-        String stepSize = getAttr(parser, "stepSize");
-        if (stepSize != null) { try { rb.setStepSize(Float.parseFloat(stepSize)); } catch (NumberFormatException e) { logAttrError("stepSize", e); } }
-
-        String isIndicator = getAttr(parser, "isIndicator");
-        if (isIndicator != null) rb.setIsIndicator("true".equals(isIndicator));
-    }
 
     // ========================================================================
     // Spinner
     // ========================================================================
 
-    private void applySpinnerAttributes(Spinner sp, XmlPullParser parser) {
-        String spinnerMode = getAttr(parser, "spinnerMode");
-        // Mode dialog vs dropdown — non géré en prévisualisation
-
-        String prompt = getAttr(parser, "prompt");
-        if (prompt != null) {
-            // Littéral ou @string/ — resolveString gère les deux
-            String promptText = resolveString(prompt);
-            if (promptText == null && !prompt.startsWith("@")) {
-                promptText = prompt;
-            }
-            if (promptText != null) sp.setPrompt(promptText);
-        }
-    }
 
     // ========================================================================
     // AdapterView (ListView, GridView, Spinner, etc.)
     // ========================================================================
 
-    private void applyAdapterViewAttributes(AdapterView<?> av, XmlPullParser parser) {
-        String entries = getAttr(parser, "entries");
-        if (entries != null) {
-            java.util.List<String> items = resolveStringArray(entries);
-            if (items != null && !items.isEmpty()) {
-                android.widget.ArrayAdapter<String> adapter =
-                        new android.widget.ArrayAdapter<>(context,
-                                android.R.layout.simple_list_item_1, items);
-                if (av instanceof Spinner) {
-                    adapter.setDropDownViewResource(
-                            android.R.layout.simple_spinner_dropdown_item);
-                }
-                ((AdapterView) av).setAdapter(adapter);
-            } else {
-                Debug.logWarning("resources",
-                        "entries non résolu (" + entries + ") — liste vide");
-            }
-        }
 
-        String divider = getAttr(parser, "divider");
-        if (divider != null && av instanceof ListView) {
-            Drawable div = resolveDrawable(divider);
-            if (div != null) ((ListView) av).setDivider(div);
-        }
 
-        String dividerHeight = getAttr(parser, "dividerHeight");
-        if (dividerHeight != null && av instanceof ListView) {
-            ((ListView) av).setDividerHeight(parseDim(dividerHeight));
-        }
-    }
-
-    private void applyListViewAttributes(ListView lv, XmlPullParser parser) {
-        String choiceMode = getAttr(parser, "choiceMode");
-        if (choiceMode != null) {
-            switch (choiceMode) {
-                case "singleChoice": lv.setChoiceMode(ListView.CHOICE_MODE_SINGLE); break;
-                case "multipleChoice": lv.setChoiceMode(ListView.CHOICE_MODE_MULTIPLE); break;
-                case "none": lv.setChoiceMode(ListView.CHOICE_MODE_NONE); break;
-            }
-        }
-
-        String fastScrollEnabled = getAttr(parser, "fastScrollEnabled");
-        if (fastScrollEnabled != null) lv.setFastScrollEnabled("true".equals(fastScrollEnabled));
-
-        String scrollbars = getAttr(parser, "scrollbars");
-        // Déjà géré dans View
-    }
-
-    private void applyGridViewAttributes(GridView gv, XmlPullParser parser) {
-        String numColumns = getAttr(parser, "numColumns");
-        if (numColumns != null) {
-            if ("auto_fit".equals(numColumns)) {
-                gv.setNumColumns(GridView.AUTO_FIT);
-            } else {
-                try { gv.setNumColumns(Integer.parseInt(numColumns)); } catch (NumberFormatException e) { logAttrError("numColumns", e); }
-            }
-        }
-
-        String columnWidth = getAttr(parser, "columnWidth");
-        if (columnWidth != null) gv.setColumnWidth(parseDim(columnWidth));
-
-        String horizontalSpacing = getAttr(parser, "horizontalSpacing");
-        if (horizontalSpacing != null) gv.setHorizontalSpacing(parseDim(horizontalSpacing));
-
-        String verticalSpacing = getAttr(parser, "verticalSpacing");
-        if (verticalSpacing != null) gv.setVerticalSpacing(parseDim(verticalSpacing));
-
-        String stretchMode = getAttr(parser, "stretchMode");
-        if (stretchMode != null) {
-            switch (stretchMode) {
-                case "none": gv.setStretchMode(GridView.NO_STRETCH); break;
-                case "spacingWidth": gv.setStretchMode(GridView.STRETCH_SPACING); break;
-                case "columnWidth": gv.setStretchMode(GridView.STRETCH_COLUMN_WIDTH); break;
-                case "spacingWidthUniform": gv.setStretchMode(GridView.STRETCH_SPACING_UNIFORM); break;
-            }
-        }
-
-        String gravity = getAttr(parser, "gravity");
-        if (gravity != null) gv.setGravity(parseGravity(gravity));
-    }
 
     // ========================================================================
     // Layouts
     // ========================================================================
 
-    private void applyLinearLayoutAttributes(LinearLayout ll, XmlPullParser parser) {
-        String orientation = getAttr(parser, "orientation");
-        if (orientation != null) {
-            ll.setOrientation("horizontal".equals(orientation)
-                    ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
-        }
 
-        String gravity = getAttr(parser, "gravity");
-        if (gravity != null) ll.setGravity(parseGravity(gravity));
 
-        String weightSum = getAttr(parser, "weightSum");
-        if (weightSum != null) { try { ll.setWeightSum(Float.parseFloat(weightSum)); } catch (NumberFormatException e) { logAttrError("weightSum", e); } }
 
-        String baselineAligned = getAttr(parser, "baselineAligned");
-        if (baselineAligned != null) ll.setBaselineAligned("true".equals(baselineAligned));
 
-        String measureWithLargestChild = getAttr(parser, "measureWithLargestChild");
-        if (measureWithLargestChild != null) ll.setMeasureWithLargestChildEnabled("true".equals(measureWithLargestChild));
 
-        String divider = getAttr(parser, "divider");
-        if (divider != null) {
-            Drawable div = resolveDrawable(divider);
-            if (div != null) ll.setDividerDrawable(div);
-        }
 
-        String showDividers = getAttr(parser, "showDividers");
-        if (showDividers != null) {
-            int dividers = 0;
-            if (showDividers.contains("beginning")) dividers |= LinearLayout.SHOW_DIVIDER_BEGINNING;
-            if (showDividers.contains("middle")) dividers |= LinearLayout.SHOW_DIVIDER_MIDDLE;
-            if (showDividers.contains("end")) dividers |= LinearLayout.SHOW_DIVIDER_END;
-            ll.setShowDividers(dividers);
-        }
-
-        String dividerPadding = getAttr(parser, "dividerPadding");
-        if (dividerPadding != null) ll.setDividerPadding(parseDim(dividerPadding));
-    }
-
-    private void applyRelativeLayoutAttributes(RelativeLayout rl, XmlPullParser parser) {
-        String gravity = getAttr(parser, "gravity");
-        if (gravity != null) rl.setGravity(parseGravity(gravity));
-
-        String ignoreGravity = getAttr(parser, "ignoreGravity");
-        if (ignoreGravity != null) {
-            rl.setIgnoreGravity(resolveViewId(ignoreGravity));
-        }
-    }
-
-    private void applyFrameLayoutAttributes(FrameLayout fl, XmlPullParser parser) {
-        String foreground = getAttr(parser, "foreground");
-        if (foreground != null) applyForeground(fl, foreground);
-
-        String foregroundGravity = getAttr(parser, "foregroundGravity");
-        if (foregroundGravity != null) fl.setForegroundGravity(parseGravity(foregroundGravity));
-
-        String measureAllChildren = getAttr(parser, "measureAllChildren");
-        if (measureAllChildren != null) fl.setMeasureAllChildren("true".equals(measureAllChildren));
-    }
-
-    private void applyGridLayoutAttributes(GridLayout gl, XmlPullParser parser) {
-        String orientation = getAttr(parser, "orientation");
-        if (orientation != null) gl.setOrientation("horizontal".equals(orientation)
-                ? GridLayout.HORIZONTAL : GridLayout.VERTICAL);
-
-        String columnCount = getAttr(parser, "columnCount");
-        if (columnCount != null) { try { gl.setColumnCount(Integer.parseInt(columnCount)); } catch (NumberFormatException e) { logAttrError("columnCount", e); } }
-
-        String rowCount = getAttr(parser, "rowCount");
-        if (rowCount != null) { try { gl.setRowCount(Integer.parseInt(rowCount)); } catch (NumberFormatException e) { logAttrError("rowCount", e); } }
-
-        String useDefaultMargins = getAttr(parser, "useDefaultMargins");
-        if (useDefaultMargins != null) gl.setUseDefaultMargins("true".equals(useDefaultMargins));
-
-        String rowOrderPreserved = getAttr(parser, "rowOrderPreserved");
-        if (rowOrderPreserved != null) gl.setRowOrderPreserved("true".equals(rowOrderPreserved));
-
-        String columnOrderPreserved = getAttr(parser, "columnOrderPreserved");
-        if (columnOrderPreserved != null) gl.setColumnOrderPreserved("true".equals(columnOrderPreserved));
-
-        String alignmentMode = getAttr(parser, "alignmentMode");
-        if (alignmentMode != null) {
-            gl.setAlignmentMode("alignBounds".equals(alignmentMode)
-                    ? GridLayout.ALIGN_BOUNDS : GridLayout.ALIGN_MARGINS);
-        }
-    }
-
-    private void applyTableLayoutAttributes(TableLayout tl, XmlPullParser parser) {
-        String shrinkColumns = getAttr(parser, "shrinkColumns");
-        String stretchColumns = getAttr(parser, "stretchColumns");
-        String collapseColumns = getAttr(parser, "collapseColumns");
-
-        // Parsing des indices de colonnes — complexe, non géré en prévisualisation
-
-        String collapsed = getAttr(parser, "collapsed");
-        // Non géré
-    }
-
-    private void applyTableRowAttributes(TableRow tr, XmlPullParser parser) {
-        // TableRow n'a pas d'attributs spécifiques au-delà de LinearLayout
-    }
-
-    private void applyScrollViewAttributes(android.widget.ScrollView sv, XmlPullParser parser) {
-        String fillViewport = getAttr(parser, "fillViewport");
-        if (fillViewport != null) sv.setFillViewport("true".equals(fillViewport));
-
-        String scrollbars = getAttr(parser, "scrollbars");
-        // Déjà géré dans View
-    }
 
     // ========================================================================
     // Views spécialisées
     // ========================================================================
 
-    private void applyCalendarViewAttributes(CalendarView cv, XmlPullParser parser) {
-        String firstDayOfWeek = getAttr(parser, "firstDayOfWeek");
-        if (firstDayOfWeek != null) { try { cv.setFirstDayOfWeek(Integer.parseInt(firstDayOfWeek)); } catch (NumberFormatException e) { logAttrError("firstDayOfWeek", e); } }
 
-        String minDate = getAttr(parser, "minDate");
-        // TODO: parse date
 
-        String maxDate = getAttr(parser, "maxDate");
-        // TODO: parse date
 
-        String shownWeekCount = getAttr(parser, "shownWeekCount");
-        if (shownWeekCount != null) { try { cv.setShownWeekCount(Integer.parseInt(shownWeekCount)); } catch (NumberFormatException e) { logAttrError("shownWeekCount", e); } }
-    }
 
-    private void applyChronometerAttributes(Chronometer ch, XmlPullParser parser) {
-        String format = getAttr(parser, "format");
-        if (format != null) ch.setFormat(format);
 
-        String countDown = getAttr(parser, "countDown");
-        // countDown nécessite API 29+ — non géré
-    }
 
-    private void applyTextClockAttributes(TextClock tc, XmlPullParser parser) {
-        String format12Hour = getAttr(parser, "format12Hour");
-        if (format12Hour != null) tc.setFormat12Hour(format12Hour);
 
-        String format24Hour = getAttr(parser, "format24Hour");
-        if (format24Hour != null) tc.setFormat24Hour(format24Hour);
-
-        String timeZone = getAttr(parser, "timeZone");
-        if (timeZone != null) tc.setTimeZone(timeZone);
-    }
-
-    private void applyNumberPickerAttributes(NumberPicker np, XmlPullParser parser) {
-        String minValue = getAttr(parser, "minValue");
-        if (minValue != null) { try { np.setMinValue(Integer.parseInt(minValue)); } catch (NumberFormatException e) { logAttrError("minValue", e); } }
-
-        String maxValue = getAttr(parser, "maxValue");
-        if (maxValue != null) { try { np.setMaxValue(Integer.parseInt(maxValue)); } catch (NumberFormatException e) { logAttrError("maxValue", e); } }
-
-        String value = getAttr(parser, "value");
-        if (value != null) { try { np.setValue(Integer.parseInt(value)); } catch (NumberFormatException e) { logAttrError("value", e); } }
-
-        String wrapSelectorWheel = getAttr(parser, "wrapSelectorWheel");
-        if (wrapSelectorWheel != null) np.setWrapSelectorWheel("true".equals(wrapSelectorWheel));
-    }
-
-    private void applySearchViewAttributes(SearchView sv, XmlPullParser parser) {
-        String queryHint = getAttr(parser, "queryHint");
-        if (queryHint != null) sv.setQueryHint(queryHint);
-
-        String iconified = getAttr(parser, "iconified");
-        if (iconified != null) sv.setIconified("true".equals(iconified));
-
-        String iconifiedByDefault = getAttr(parser, "iconifiedByDefault");
-        if (iconifiedByDefault != null) sv.setIconifiedByDefault("true".equals(iconifiedByDefault));
-    }
-
-    private void applyViewAnimatorAttributes(ViewAnimator va, XmlPullParser parser) {
-        String displayedChild = getAttr(parser, "displayedChild");
-        if (displayedChild != null) { try { va.setDisplayedChild(Integer.parseInt(displayedChild)); } catch (NumberFormatException e) { logAttrError("displayedChild", e); } }
-
-        String animateFirstView = getAttr(parser, "animateFirstView");
-        if (animateFirstView != null) va.setAnimateFirstView("true".equals(animateFirstView));
-    }
-
-    private void applyDatePickerAttributes(DatePicker dp, XmlPullParser parser) {
-        String spinnersShown = getAttr(parser, "spinnersShown");
-        if (spinnersShown != null) dp.setSpinnersShown("true".equals(spinnersShown));
-
-        String calendarViewShown = getAttr(parser, "calendarViewShown");
-        if (calendarViewShown != null) dp.setCalendarViewShown("true".equals(calendarViewShown));
-
-        String firstDayOfWeek = getAttr(parser, "firstDayOfWeek");
-        if (firstDayOfWeek != null) { try { dp.setFirstDayOfWeek(Integer.parseInt(firstDayOfWeek)); } catch (NumberFormatException e) { logAttrError("firstDayOfWeek", e); } }
-    }
-
-    private void applyTimePickerAttributes(TimePicker tp, XmlPullParser parser) {
-        String timePickerMode = getAttr(parser, "timePickerMode");
-        // Mode spinner vs clock — non géré en prévisualisation
-
-        String hour = getAttr(parser, "hour");
-        if (hour != null) { try { tp.setHour(Integer.parseInt(hour)); } catch (NumberFormatException e) { logAttrError("hour", e); } }
-
-        String minute = getAttr(parser, "minute");
-        if (minute != null) { try { tp.setMinute(Integer.parseInt(minute)); } catch (NumberFormatException e) { logAttrError("minute", e); } }
-
-        String am_pm = getAttr(parser, "am_pm");
-        // Non géré
-    }
 
     // ========================================================================
     // Attributs app: (Material Components, AndroidX)
@@ -1208,7 +630,7 @@ public final class AttributeApplier {
     /**
      * Lit un attribut app:* depuis le parser.
      */
-    private String getAppAttr(XmlPullParser parser, String name) {
+    String getAppAttr(XmlPullParser parser, String name) {
         String value = parser.getAttributeValue(NS_APP, name);
         if (value == null) {
             int count = parser.getAttributeCount();
@@ -1226,7 +648,7 @@ public final class AttributeApplier {
     // Helpers
     // ========================================================================
 
-    private String getAttr(XmlPullParser parser, String name) {
+    String getAttr(XmlPullParser parser, String name) {
         String value = parser.getAttributeValue(NS_ANDROID, name);
         if (value == null) {
             int count = parser.getAttributeCount();
@@ -1240,7 +662,7 @@ public final class AttributeApplier {
         return value;
     }
 
-    private void applyTextColor(TextView tv, String value) {
+    void applyTextColor(TextView tv, String value) {
         try {
             if (value.startsWith("#")) {
                 tv.setTextColor(ColorParser.parse(value));
@@ -1254,7 +676,7 @@ public final class AttributeApplier {
         } catch (RuntimeException e) { logAttrError("tickVisible", e); }
     }
 
-    private void applyBackground(View view, String value) {
+    void applyBackground(View view, String value) {
         if (value == null) return;
         try {
             if (value.startsWith("#")) {
@@ -1272,7 +694,7 @@ public final class AttributeApplier {
         } catch (RuntimeException e) { logAttrError("tickVisible", e); }
     }
 
-    private void applyImageSrc(ImageView iv, String value) {
+    void applyImageSrc(ImageView iv, String value) {
         if (value == null) return;
         try {
             if (value.startsWith("@drawable/")) {
@@ -1286,7 +708,7 @@ public final class AttributeApplier {
         } catch (RuntimeException e) { logAttrError("tickVisible", e); }
     }
 
-    private void applyForeground(View view, String value) {
+    void applyForeground(View view, String value) {
         try {
             if (value.startsWith("#")) {
                 if (view instanceof FrameLayout) {
@@ -1321,7 +743,7 @@ public final class AttributeApplier {
      * @param view la vue cible
      * @param styleRef la référence du style
      */
-    private void applyStyle(View view, String styleRef) {
+    void applyStyle(View view, String styleRef) {
         if (styleRef == null || styleRef.isEmpty()) return;
 
         int styleId = 0;
@@ -1420,7 +842,7 @@ public final class AttributeApplier {
      * @param tv le TextView
      * @param styleId l'id du style
      */
-    private void applyTextStyle(TextView tv, int styleId) {
+    void applyTextStyle(TextView tv, int styleId) {
         android.content.res.TypedArray a = context.obtainStyledAttributes(styleId,
                 new int[]{
                         android.R.attr.text,
@@ -1525,7 +947,7 @@ public final class AttributeApplier {
      * @param attr le nom de l'attribut concerné (approximatif si inconnu)
      * @param e    l'exception attrapée
      */
-    private static void logAttrError(String attr, RuntimeException e) {
+    static void logAttrError(String attr, RuntimeException e) {
         Debug.logWarning("attributes",
                 "Attribut '" + attr + "' ignoré : " + e.getClass().getSimpleName()
                         + (e.getMessage() != null ? " (" + e.getMessage() + ")" : ""));
@@ -1794,7 +1216,7 @@ public final class AttributeApplier {
         return null;
     }
 
-    private int parseGravity(String value) {
+    int parseGravity(String value) {
         int gravity = 0;
         if (value == null) return gravity;
         String[] parts = value.split("\\|");
@@ -1819,7 +1241,7 @@ public final class AttributeApplier {
         return gravity;
     }
 
-    private int parseInputType(String value) {
+    int parseInputType(String value) {
         int type = InputType.TYPE_CLASS_TEXT;
         String[] parts = value.split("\\|");
         for (String part : parts) {
@@ -1847,7 +1269,7 @@ public final class AttributeApplier {
         return type;
     }
 
-    private int parseDim(String value) {
+    int parseDim(String value) {
         if (value == null || value.isEmpty()) return 0;
         if ("match_parent".equals(value) || "fill_parent".equals(value)) return ViewGroup.LayoutParams.MATCH_PARENT;
         if ("wrap_content".equals(value)) return ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -1857,7 +1279,7 @@ public final class AttributeApplier {
         try { return Integer.parseInt(value.replaceAll("[^0-9-]", "")); } catch (NumberFormatException e) { return 0; }
     }
 
-    private int resolveViewId(String idValue) {
+    int resolveViewId(String idValue) {
         if (idValue == null) return View.NO_ID;
         if (idValue.startsWith("@+id/") || idValue.startsWith("@id/")) {
             String name = idValue.substring(idValue.indexOf('/') + 1);
