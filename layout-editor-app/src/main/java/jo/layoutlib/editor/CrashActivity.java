@@ -87,7 +87,18 @@ public class CrashActivity extends AppCompatActivity {
             exceptionMessageText.setVisibility(View.GONE);
         }
 
-        stackTraceText.setText(stackTrace);
+        // Le stack trace ne s'affiche qu'en build debug — en release on ne
+        // divulgue rien du fonctionnement interne (juste un message générique).
+        if (BuildConfig.DEBUG) {
+            stackTraceText.setText(stackTrace != null ? stackTrace
+                    : "Aucun stack trace disponible");
+        } else {
+            stackTrace = null; // rien de copiable/partageable en release
+            stackTraceText.setText("Détails techniques disponibles uniquement "
+                    + "dans le build debug.");
+            copyButton.setVisibility(View.GONE);
+            shareButton.setVisibility(View.GONE);
+        }
     }
 
     private void setupListeners() {

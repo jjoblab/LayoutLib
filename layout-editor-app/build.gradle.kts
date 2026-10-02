@@ -28,6 +28,10 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+
+    testOptions {
+        unitTests { isReturnDefaultValues = true }
+    }
 }
 
 dependencies {
@@ -48,4 +52,12 @@ dependencies {
     implementation("androidx.recyclerview:recyclerview:1.3.2")
     implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
+
+    // Tests unitaires JVM (XmlMutator, UndoRedoManager)
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
+    testImplementation("org.assertj:assertj-core:3.26.0")
+}
+
+tasks.withType<Test> {
+    useJUnitPlatform()
 }

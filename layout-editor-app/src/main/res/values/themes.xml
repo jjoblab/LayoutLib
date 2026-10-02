@@ -55,47 +55,8 @@
     </style>
 
     <!-- Icon button (round) -->
-    <style name="Widget.LayoutEditor.IconButton" parent="Widget.Material3.Button.TextButton">
-        <item name="android:layout_width">@dimen/app_bar_icon_size</item>
-        <item name="android:layout_height">@dimen/app_bar_icon_size</item>
-        <item name="android:padding">0dp</item>
-        <item name="android:insetTop">0dp</item>
-        <item name="android:insetBottom">0dp</item>
-        <item name="android:minWidth">0dp</item>
-        <item name="android:minHeight">0dp</item>
-        <item name="cornerRadius">19dp</item>
-        <item name="iconTint">@color/editor_on_surface_2</item>
-        <item name="backgroundTint">@android:color/transparent</item>
-    </style>
-
     <!-- Property input -->
-    <style name="Widget.LayoutEditor.PropInput" parent="android:Widget.EditText">
-        <item name="android:layout_width">match_parent</item>
-        <item name="android:layout_height">@dimen/prop_input_height</item>
-        <item name="android:background">@drawable/prop_input_bg</item>
-        <item name="android:paddingStart">10dp</item>
-        <item name="android:paddingEnd">10dp</item>
-        <item name="android:textColor">@color/editor_on_surface</item>
-        <item name="android:textColorHint">@color/editor_on_surface_3</item>
-        <item name="android:textSize">@dimen/text_small_medium</item>
-        <item name="android:fontFamily">monospace</item>
-        <item name="android:singleLine">true</item>
-        <item name="android:inputType">text</item>
-    </style>
-
     <!-- Tree node row -->
-    <style name="Widget.LayoutEditor.TreeNode" parent="android:Widget">
-        <item name="android:layout_width">match_parent</item>
-        <item name="android:layout_height">wrap_content</item>
-        <item name="android:orientation">horizontal</item>
-        <item name="android:gravity">center_vertical</item>
-        <item name="android:paddingStart">8dp</item>
-        <item name="android:paddingEnd">8dp</item>
-        <item name="android:paddingTop">7dp</item>
-        <item name="android:paddingBottom">7dp</item>
-        <item name="android:background">@drawable/tree_node_bg</item>
-    </style>
-
     <!-- FAB squared shape -->
     <style name="FabSquared" parent="">
         <item name="cornerFamily">rounded</item>
@@ -109,15 +70,6 @@
     </style>
 
     <!-- BottomNavigationView style — Material 3 dark, active item with pill indicator -->
-    <style name="Widget.LayoutEditor.BottomNavigationView" parent="Widget.Material3.BottomNavigationView">
-        <item name="android:background">@color/editor_surface</item>
-        <item name="itemIconTint">@color/bottom_nav_item_color</item>
-        <item name="itemTextColor">@color/bottom_nav_item_color</item>
-        <item name="itemActiveIndicatorStyle">@style/Widget.LayoutEditor.BottomNavigationView.ActiveIndicator</item>
-        <item name="labelVisibilityMode">labeled</item>
-        <item name="elevation">0dp</item>
-    </style>
-
     <!-- Active indicator : pill violet avec opacité -->
     <style name="Widget.LayoutEditor.BottomNavigationView.ActiveIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
         <item name="android:color">@color/editor_primary_container</item>
