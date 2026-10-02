@@ -2,6 +2,8 @@ package jo.layoutlib.drawables.delegates;
 
 import android.graphics.drawable.StateListDrawable;
 
+import androidx.annotation.RequiresApi;
+
 /**
  * Delegate pour StateListDrawable, inspiré de l AOSP.
  *
@@ -27,9 +29,13 @@ public class StateListDrawable_Delegate {
     /**
      * Récupère le nombre d états.
      *
+     * <p><strong>Note :</strong> {@code getStateCount()} n existe que depuis
+     * l API 29 ; le périmètre d un tel appel doit être vérifié sur minSdk 24.</p>
+     *
      * @param drawable le StateListDrawable
      * @return le nombre d états
      */
+    @RequiresApi(29)
     public static int getStateCount(StateListDrawable drawable) {
         if (drawable == null) return 0;
         return drawable.getStateCount();

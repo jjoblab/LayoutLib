@@ -44,8 +44,27 @@ public class AttributeDefinitionImpl {
         flagValues.put(name, value);
     }
 
+    /**
+     * Résout une valeur de flag (combinaison OR des flags séparés par {@code |}).
+     *
+     * @param name le nom du flag (ex. {@code "bold"}) ou d'une combinaison
+     *             (ex. {@code "bold|italic"})
+     * @return la valeur entière combinée, ou {@code null} si un flag est inconnu
+     */
     public Integer getFlagValue(String name) {
-        return flagValues.get(name);
+        if (name == null) {
+            return null;
+        }
+        String[] parts = name.split("\\|");
+        int result = 0;
+        for (String part : parts) {
+            Integer v = flagValues.get(part.trim());
+            if (v == null) {
+                return null;
+            }
+            result |= v;
+        }
+        return result;
     }
 
     public Map<String, Integer> getEnumValues() {

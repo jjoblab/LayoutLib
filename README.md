@@ -134,7 +134,7 @@ export ANDROID_HOME=/path/to/android-sdk
 // layout-editor-app/build.gradle.kts
 val codeEditorVersion = "v3.41.0"
 dependencies {
-    implementation("com.github.jjoblab:cel-ui:$codeEditorVersion")
+    implementation("com.github.jjoblab.code-editor:cel-ui:$codeEditorVersion")
 }
 ```
 

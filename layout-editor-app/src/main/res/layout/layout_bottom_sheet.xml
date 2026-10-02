@@ -79,7 +79,7 @@
             android:layout_height="32dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_filter"
-            android:tint="@color/editor_on_surface_2"
+            app:tint="@color/editor_on_surface_2"
             android:contentDescription="@string/action_filter" />
     </LinearLayout>
 

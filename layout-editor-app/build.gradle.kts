@@ -39,8 +39,9 @@ dependencies {
     implementation(project(":module-layout"))
 
     // code-editor (github.com/jjoblab/code-editor) — EditorView + EditorSession.
+    // Dépôt multi-modules : JitPack publie sous com.github.jjoblab.code-editor.
     // cel-ui expose cel-core et cel-lsp-api en `api` (transitif).
-    implementation("com.github.jjoblab:cel-ui:$codeEditorVersion")
+    implementation("com.github.jjoblab.code-editor:cel-ui:$codeEditorVersion")
 
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.core:core:1.13.1")

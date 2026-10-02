@@ -5,6 +5,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import jo.layoutlib.attributes.api.AttributeDefinitionImpl;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -67,7 +69,7 @@ class AttributeRegistryImplTest {
                             + "</attr>"
                             + "</declare-styleable>"
                             + "</resources>");
-            AttributeDefinition attr = registry.getAttributeDefinition("gravity");
+            AttributeDefinitionImpl attr = registry.getAttributeDefinition("gravity");
             assertThat(attr).isNotNull();
             assertThat(attr.getEnumValue("top")).isEqualTo(1);
             assertThat(attr.getEnumValue("bottom")).isEqualTo(2);
@@ -85,7 +87,7 @@ class AttributeRegistryImplTest {
                             + "</attr>"
                             + "</declare-styleable>"
                             + "</resources>");
-            AttributeDefinition attr = registry.getAttributeDefinition("textStyle");
+            AttributeDefinitionImpl attr = registry.getAttributeDefinition("textStyle");
             assertThat(attr).isNotNull();
             assertThat(attr.getFlagValue("bold|italic")).isEqualTo(3);
         }
@@ -101,7 +103,7 @@ class AttributeRegistryImplTest {
                             + "</attr>"
                             + "</declare-styleable>"
                             + "</resources>");
-            AttributeDefinition attr = registry.getAttributeDefinition("flags");
+            AttributeDefinitionImpl attr = registry.getAttributeDefinition("flags");
             assertThat(attr.getFlagValue("x")).isEqualTo(16);
         }
 

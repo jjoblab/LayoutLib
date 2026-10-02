@@ -95,7 +95,8 @@ public class ViewFactory {
             constructorCache.put(className + (attrs != null ? "_attrs" : ""), constructor);
         }
         try {
-            if (attrs != null && constructor.getParameterCount() == 2) {
+            // getParameterTypes().length plutôt que getParameterCount() (API 26+).
+            if (attrs != null && constructor.getParameterTypes().length == 2) {
                 return (View) constructor.newInstance(context, attrs);
             } else {
                 return (View) constructor.newInstance(context);

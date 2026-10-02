@@ -1,6 +1,7 @@
 package jo.layoutlib.inflater;
 
 import android.content.Context;
+import android.os.Build;
 import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
@@ -566,7 +567,10 @@ public final class AttributeApplier {
         if (progressTint != null) { try { pb.setProgressTintList(android.content.res.ColorStateList.valueOf(ColorParser.parse(progressTint))); } catch (Exception ignored) {} }
 
         String min = getAttr(parser, "min");
-        if (min != null) { try { pb.setMin(Integer.parseInt(min)); } catch (NumberFormatException ignored) {} }
+        // ProgressBar#setMin n existe qu à partir de l API 26 (minSdk = 24).
+        if (min != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try { pb.setMin(Integer.parseInt(min)); } catch (NumberFormatException ignored) {}
+        }
     }
 
     private void applySeekBarAttributes(AbsSeekBar sb, XmlPullParser parser) {

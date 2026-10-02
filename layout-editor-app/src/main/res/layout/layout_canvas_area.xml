@@ -202,7 +202,7 @@
             android:layout_height="@dimen/zoom_btn_size"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_zoom_in"
-            android:tint="@color/editor_on_surface_2"
+            app:tint="@color/editor_on_surface_2"
             android:scaleType="centerInside" />
 
         <TextView
@@ -223,7 +223,7 @@
             android:layout_height="@dimen/zoom_btn_size"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_zoom_out"
-            android:tint="@color/editor_on_surface_2"
+            app:tint="@color/editor_on_surface_2"
             android:scaleType="centerInside" />
 
         <ImageButton
@@ -232,7 +232,7 @@
             android:layout_height="@dimen/zoom_btn_size"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_zoom_fit"
-            android:tint="@color/editor_on_surface_2"
+            app:tint="@color/editor_on_surface_2"
             android:scaleType="centerInside" />
     </LinearLayout>
 

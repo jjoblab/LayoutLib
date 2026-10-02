@@ -7,6 +7,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 
+import android.annotation.SuppressLint;
+
 /**
  * Programme principal pour générer un rapport de validation à partir des
  * 50 layouts de test.
@@ -35,8 +37,14 @@ public final class ReportMain {
     /**
      * Point d'entrée du programme.
      *
+     * <p><strong>JVM uniquement</strong> : ce main est conçu pour être exécuté
+     * sur un ordinateur ({@code java -cp ...}), jamais sur Android — l usage de
+     * {@code java.nio.file} (API 26+) est donc sans risque, d où le
+     * {@code @SuppressLint("NewApi")}.</p>
+     *
      * @param args args[0] = chemin du fichier HTML de sortie
      */
+    @SuppressLint("NewApi")
     public static void main(String[] args) {
         Path outputPath;
         if (args.length >= 1) {
