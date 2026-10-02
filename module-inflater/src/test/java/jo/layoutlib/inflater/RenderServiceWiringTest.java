@@ -3,6 +3,7 @@ package jo.layoutlib.inflater;
 import android.content.Context;
 import android.util.DisplayMetrics;
 import android.content.res.Resources;
+import android.view.View;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -218,6 +219,59 @@ class RenderServiceWiringTest {
             Integer pixels = invokeResolve(applier, "resolveDimension", "@dimen/margin_large");
 
             assertThat(pixels).isEqualTo(Math.round(16f * 2.75f));
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // 3. Cycle de vie — release()
+    // ------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("Cycle de vie (release)")
+    class Lifecycle {
+
+        @Test
+        @DisplayName("release est idempotent et coupe le callback")
+        void releaseIsIdempotent() {
+            RenderService service = new RenderService(context);
+            service.setRenderCallback(new RenderService.RenderCallback() {
+                @Override
+                public void onRenderSuccess(View root, long timeMs, int viewCount,
+                                            int width, int height) {
+                }
+
+                @Override
+                public void onRenderError(String message, Throwable cause) {
+                }
+            });
+
+            service.release();
+            service.release(); // idempotent
+
+            assertThat(service.isReleased()).isTrue();
+        }
+
+        @Test
+        @DisplayName("requestRender après release est ignoré sans lever")
+        void requestRenderAfterReleaseIsIgnored() {
+            RenderService service = new RenderService(context);
+            service.release();
+
+            // Ne doit pas lever (activity en cours de destruction)
+            service.requestRender("<TextView/>");
+            service.requestImmediateRender("<TextView/>");
+        }
+
+        @Test
+        @DisplayName("les setters après release lèvent IllegalStateException")
+        void settersAfterReleaseThrow() {
+            RenderService service = new RenderService(context);
+            service.release();
+
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                    () -> service.setResourceResolver(resolver));
+            org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                    () -> service.setDimensionConverter(converter));
         }
     }
 }

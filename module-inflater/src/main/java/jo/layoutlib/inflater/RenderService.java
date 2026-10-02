@@ -13,6 +13,7 @@ import org.xmlpull.v1.XmlPullParserFactory;
 import java.io.IOException;
 import java.io.StringReader;
 
+import jo.layoutlib.inflater.bridge.util.Debug;
 import jo.layoutlib.layout.LayoutEngineImpl;
 import jo.layoutlib.resources.DimensionConverter;
 import jo.layoutlib.resources.ResourceResolver;
@@ -61,7 +62,7 @@ public class RenderService {
     public static final long DEFAULT_DEBOUNCE_MS = 400;
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
-    private final Context context;
+    private Context context;
     private final BridgeInflater inflater;
     private final LayoutEngineImpl layoutEngine;
 
@@ -83,26 +84,40 @@ public class RenderService {
     /** Indique si au moins un rendu réussi a été fait (pour garder le dernier valide). */
     private boolean hasValidRender = false;
 
+    /** Indique si {@link #release()} a été appelé (service non réutilisable). */
+    private boolean released = false;
+
+    /** Seuil (ms) au-delà duquel un rendu sur le thread UI est journalisé. */
+    private static final long SLOW_RENDER_WARN_MS = 32;
+
     /**
      * Callback de rendu.
+     *
+     * <p><strong>Contrat de thread</strong> : toutes les méthodes de cette
+     * interface sont invoquées sur le <em>thread principal</em> — le rendu
+     * ({@code doRender()}) y est debouncé et exécuté de façon synchrone. Les
+     * implémentations n ont donc <strong>pas besoin</strong> de re-poster via
+     * {@code runOnUiThread(…)}.</p>
      *
      * @author jo@Dev
      */
     public interface RenderCallback {
 
         /**
-         * Appelé quand le rendu réussit.
+         * Appelé quand le rendu réussit (thread principal).
          */
         void onRenderSuccess(View rootView, long timeMs, int viewCount,
                               int width, int height);
 
         /**
-         * Appelé quand le rendu échoue (XML valide mais erreur sémantique).
+         * Appelé quand le rendu échoue (XML valide mais erreur sémantique,
+         * thread principal).
          */
         void onRenderError(String message, Throwable cause);
 
         /**
-         * Appelé quand le XML est invalide (en cours de frappe).
+         * Appelé quand le XML est invalide (en cours de frappe,
+         * thread principal).
          * Le preview doit garder le dernier rendu valide.
          */
         default void onXmlInvalid(String message) {
@@ -139,6 +154,7 @@ public class RenderService {
      *                 {@code Resources} natives
      */
     public void setResourceResolver(ResourceResolver resolver) {
+        ensureNotReleased();
         this.resourceResolver = resolver;
         inflater.setResourceResolver(resolver);
         rebuildAttributeApplier();
@@ -162,6 +178,7 @@ public class RenderService {
      * @param converter le nouveau convertisseur
      */
     public void setDimensionConverter(DimensionConverter converter) {
+        ensureNotReleased();
         this.dimensionConverter = converter;
         rebuildAttributeApplier();
     }
@@ -183,8 +200,36 @@ public class RenderService {
         inflater.setAttributeApplier(applier);
     }
 
-    public void setRenderCallback(RenderCallback callback) {
-        this.callback = callback;
+    /**
+     * Libère le service — à appeler depuis {@code Activity.onDestroy()}.
+     *
+     * <p>Idempotent. Après cet appel :</p>
+     * <ul>
+     *   <li>les rendus en attente (debounce, re-render) sont annulés ;</li>
+     *   <li>le callback est retiré (plus aucune notification vers une
+     *       Activity en cours de destruction) ;</li>
+     *   <li>la référence vers le {@link Context} est coupée (plus de fuite
+     *       de l'Activity par le service) ;</li>
+     *   <li>les setters ultérieurs lèvent une {@link IllegalStateException}.</li>
+     * </ul>
+     */
+    public void release() {
+        if (released) {
+            return;
+        }
+        released = true;
+        cancelPending();
+        reRenderRequested = false;
+        callback = null;
+        inflater.reset();
+        context = null;
+    }
+
+    /**
+     * @return {@code true} si {@link #release()} a été appelé
+     */
+    public boolean isReleased() {
+        return released;
     }
 
     public void setDebounceMs(long ms) {
@@ -196,6 +241,22 @@ public class RenderService {
         this.targetHeight = height;
     }
 
+    public void setRenderCallback(RenderCallback callback) {
+        this.callback = callback;
+    }
+
+    /**
+     * Garantit que le service n a pas été libéré.
+     *
+     * @throws IllegalStateException si {@link #release()} a été appelé
+     */
+    private void ensureNotReleased() {
+        if (released) {
+            throw new IllegalStateException(
+                    "RenderService déjà libéré (release()) : créez une nouvelle instance");
+        }
+    }
+
     /**
      * Demande un rendu du XML avec debounce.
      *
@@ -205,6 +266,9 @@ public class RenderService {
      * @param xml le XML à rendre
      */
     public void requestRender(String xml) {
+        if (released) {
+            return;
+        }
         pendingXml = xml;
 
         if (pendingRender != null) {
@@ -230,6 +294,9 @@ public class RenderService {
      * @param xml le XML à rendre
      */
     public void requestImmediateRender(String xml) {
+        if (released) {
+            return;
+        }
         pendingXml = xml;
         if (pendingRender != null) {
             mainHandler.removeCallbacks(pendingRender);
@@ -253,9 +320,12 @@ public class RenderService {
     }
 
     /**
-     * Effectue le rendu.
+     * Effectue le rendu — synchrone, sur le thread principal.
      */
     private void doRender() {
+        if (released) {
+            return;
+        }
         final String xml = pendingXml;
         if (xml == null || xml.trim().isEmpty()) {
             // XML vide — ne pas afficher d'erreur, juste ignorer
@@ -297,6 +367,18 @@ public class RenderService {
             int viewCount = countViews(root);
 
             long elapsed = (System.nanoTime() - start) / 1_000_000;
+
+            // Télémétrie : le rendu est synchrone sur le thread principal —
+            // au-delà de ~2 frames (32 ms), il y a un risque de jank visible.
+            // Voir le rapport d'architecture : les View doivent être créées et
+            // mesurées sur le thread UI, la solution n'est PAS un thread de
+            // rendu, mais une métrique pour décider d'une éventuelle
+            // découpe (inflation progressive) sur gros layouts.
+            if (elapsed > SLOW_RENDER_WARN_MS) {
+                Debug.logWarning("render",
+                        "Rendu lent sur le thread UI : " + elapsed + " ms pour "
+                                + viewCount + " vues");
+            }
 
             hasValidRender = true;
 

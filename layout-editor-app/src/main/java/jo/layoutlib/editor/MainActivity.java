@@ -195,6 +195,45 @@ public class MainActivity extends AppCompatActivity {
         designScroll.post(() -> renderService.requestImmediateRender(DEFAULT_XML));
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+
+        // 1. Annuler le push d'historique debouncé en attente
+        if (pendingHistoryPush != null) {
+            historyHandler.removeCallbacks(pendingHistoryPush);
+            pendingHistoryPush = null;
+        }
+
+        // 2. Arrêter toute animation en cours (FAB)
+        if (fab != null) {
+            fab.clearAnimation();
+            fab.animate().cancel();
+        }
+
+        // 3. Refermer la palette de composants si ouverte
+        if (palettePopup != null) {
+            if (palettePopup.isShowing()) {
+                palettePopup.dismiss();
+            }
+            palettePopup = null;
+        }
+
+        // 4. Libérer le RenderService : annule les rendus debouncés en
+        //    attente, retire le callback (plus de notification vers une
+        //    Activity détruite) et coupe la référence vers le Context.
+        if (renderService != null) {
+            renderService.release();
+            renderService = null;
+        }
+
+        // 5. Couper les références restantes vers la hiérarchie rendue
+        overlayView = null;
+        renderedRoot = null;
+        currentRootInfo = null;
+        selectedView = null;
+    }
+
     // ============================================================
     // BIND VIEWS
     // ============================================================
