@@ -8,7 +8,8 @@ plugins {
 
 android {
     namespace = "jo.layoutlib.validation"
-    compileSdk = 34
+    compileSdk = 37
+    compileSdkMinor = 2
 
     defaultConfig {
         minSdk = 24
@@ -16,8 +17,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     testOptions {
@@ -36,6 +37,7 @@ dependencies {
     implementation(libs.androidx.annotation)
 
     testImplementation(libs.junit.jupiter)
+    testRuntimeOnly(libs.junit.platform.launcher)
     testImplementation(libs.assertj.core)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)

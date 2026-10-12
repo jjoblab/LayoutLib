@@ -4,8 +4,8 @@
 >
 > **Auteur :** `jo@Dev` (toutes les Javadoc)
 > **Langue des Javadoc :** Français
-> **Version :** 2.1.0 — Alignée sur l'architecture AOSP layoutlib
-> **Cible :** Android minSdk 24, compileSdk 34, Java 11
+> **Version :** 2.2.0 — Alignée sur l'architecture AOSP layoutlib ; toolchain alignée sur CodeIDE (Gradle 9.7.1, AGP 9.4.1, JDK 21, compileSdk 37.2)
+> **Cible :** Android minSdk 24, compileSdk 37.2, Java 17
 > **Référence AOSP :** https://android.googlesource.com/platform/frameworks/layoutlib
 
 ## Mission
@@ -67,6 +67,42 @@ listOf(
 }
 ```
 
+> **Limite** : cette recette fait entrer les modules dans le build de l'hôte —
+> les alias `libs.*` de leurs `build.gradle.kts` se résolvent alors contre le
+> **catalogue de l'hôte**, pas celui de LayoutLib. Elle convient aux hôtes
+> sans catalogue (ou dont le catalogue expose les mêmes alias).
+
+### Alternative sans fusion de build : build composite (retenu par CodeIDE)
+
+Pour un hôte qui possède son propre catalogue de versions, l'intégration par
+**build composite** laisse chaque dépôt autonome (catalogue, conventions,
+
+versions) — c'est ce que fait CodeIDE depuis le 2026-10-13 (plus de
+
+publication JitPack, projet personnel GitHub-only) :
+
+```kotlin
+// settings.gradle.kts de l'hôte — LayoutLib en checkout frère
+includeBuild("../LayoutLib") {
+    dependencySubstitution {
+        substitute(module("com.github.jjoblab.LayoutLib:module-inflater"))
+            .using(project(":module-inflater"))
+        // idem pour module-resources, module-drawables, module-themes,
+        // module-attributes, module-layout
+    }
+}
+
+// consommateur
+dependencies {
+    implementation("com.github.jjoblab.LayoutLib:module-inflater")
+    // les 5 modules frères arrivent en transitif (api(project(...)))
+}
+```
+
+La substitution ignore la version : l'épinglage se fait par le **ref git**
+
+check out (tag du dépôt).
+
 ### Utilisation depuis Kotlin/Java
 
 ```java
@@ -106,7 +142,7 @@ Toutes les classes Java respectent les conventions suivantes :
 
 ```bash
 # Variables d'environnement
-export JAVA_HOME=/path/to/jdk-17
+export JAVA_HOME=/path/to/jdk-21
 export ANDROID_HOME=/path/to/android-sdk
 
 # Tests JVM de tous les modules
@@ -136,7 +172,8 @@ export ANDROID_HOME=/path/to/android-sdk
 
 ```kotlin
 // layout-editor-app/build.gradle.kts — coordonnées centralisées
-// dans gradle/libs.versions.toml (version codeEditor = "v3.41.0")
+// dans gradle/libs.versions.toml (version codeEditor = "3.49.2" —
+// alignée sur CodeIDE)
 dependencies {
     implementation(libs.code.editor)
 }

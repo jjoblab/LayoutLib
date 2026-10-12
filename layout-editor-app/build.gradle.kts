@@ -7,7 +7,8 @@ plugins {
 
 android {
     namespace = "jo.layoutlib.editor"
-    compileSdk = 34
+    compileSdk = 37
+    compileSdkMinor = 2
 
     defaultConfig {
         applicationId = "jo.layoutlib.editor"
@@ -40,8 +41,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     testOptions {
@@ -70,6 +71,7 @@ dependencies {
 
     // Tests unitaires JVM (XmlMutator, UndoRedoManager)
     testImplementation(libs.junit.jupiter)
+    testRuntimeOnly(libs.junit.platform.launcher)
     testImplementation(libs.assertj.core)
 }
 

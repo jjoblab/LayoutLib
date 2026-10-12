@@ -14,7 +14,7 @@ maven {
 }
 
 // layout-editor-app/build.gradle.kts
-val codeEditorVersion = "v3.41.0"   // tag Git de jjoblab/code-editor
+val codeEditorVersion = "3.49.2"   // tag Git de jjoblab/code-editor (aligné CodeIDE)
 dependencies {
     implementation("com.github.jjoblab.code-editor:cel-ui:$codeEditorVersion")
 }
@@ -24,29 +24,34 @@ dependencies {
 
 **Remarques**
 - Au premier build, JitPack construit la bibliothèque à la demande depuis le tag : la première résolution peut être lente ou échouer (timeout) ; relancer le build.
-- **Coordonnée confirmée** : le dépôt étant multi-modules, JitPack publie sous le groupe `com.github.jjoblab.code-editor` (vérifié : `https://jitpack.io/com/github/jjoblab/code-editor/cel-ui/v3.41.0/`).
-- Alternative : GitHub Packages (`jo.codeeditor:cel-ui:3.41.0`, dépôt `https://maven.pkg.github.com/jjoblab/code-editor`) — nécessite `gpr.user` / `gpr.key` dans `~/.gradle/gradle.properties`.
+- **Coordonnée confirmée** : le dépôt étant multi-modules, JitPack publie sous le groupe `com.github.jjoblab.code-editor` (vérifié : `https://jitpack.io/com/github/jjoblab/code-editor/cel-ui/3.49.2/`).
+- Alternative : GitHub Packages (`jo.codeeditor:cel-ui:3.49.2`, dépôt `https://maven.pkg.github.com/jjoblab/code-editor`) — nécessite `gpr.user` / `gpr.key` dans `~/.gradle/gradle.properties`.
 
 ## Outils requis
 
-- **OpenJDK 17** (Temurin recommandé) — `java -version` doit afficher 17.x
+Environnement **aligné sur CodeIDE** (décision propriétaire 2026-10-13) : les
+ deux dépôts partagent le même outillage (JDK, Gradle, AGP) — démon Gradle et
+caches partagés.
+
+- **OpenJDK 21** (Temurin recommandé) — `java -version` doit afficher 21.x
 - **Android SDK** avec :
   - `platform-tools`
-  - `platforms;android-34`
-  - `build-tools;34.0.0`
+  - `platforms;android-37` (mineure 37.2 — auto-installée par AGP si les licences sont acceptées)
+  - `build-tools` (la version requise par AGP 9.4.1 est auto-installée)
   - `cmdline-tools;latest`
-- **Gradle 8.7** (le wrapper `./gradlew` est inclus)
-- **AGP 8.5.0**
+- **Gradle 9.7.1** (le wrapper `./gradlew` est inclus)
+- **AGP 9.4.1**
 - Accès réseau à `jitpack.io` au premier build (voir « Dépendance code-editor »)
 
 ## Installation rapide (Linux)
 
 ```bash
-# 1. Temurin JDK 17
-curl -fsSL -o jdk17.tar.gz \
-  "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.13%2B11/OpenJDK17U-jdk_x64_linux_hotspot_17.0.13_11.tar.gz"
-tar -xzf jdk17.tar.gz
-export JAVA_HOME=$(pwd)/jdk-17.0.13+11
+# 1. Temurin JDK 21
+# (CodeIDE utilise l'API « latest » d'Adoptium ; URL de release fixe :)
+curl -fsSL -o jdk21.tar.gz \
+  "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.12%2B1/OpenJDK21U-jdk_x64_linux_hotspot_21.0.12_1.tar.gz"
+tar -xzf jdk21.tar.gz
+export JAVA_HOME=$(pwd)/jdk-21.0.12+1
 
 # 2. Android cmdline-tools
 curl -fsSL -o cmdline-tools.zip \
@@ -57,8 +62,7 @@ mv cmdline-tools android-sdk/cmdline-tools/latest
 export ANDROID_HOME=$(pwd)/android-sdk
 export ANDROID_SDK_ROOT=$ANDROID_HOME
 yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
-$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
-  "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-37" "build-tools;36.0.0"
 
 # 3. Variables d'environnement
 export PATH=$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
@@ -165,10 +169,10 @@ rendu valide — comme Android Studio).
 
 ## Dépendances principales
 
-- AGP 8.5.0
-- Gradle 8.7
-- AndroidX appcompat 1.7.0
-- AndroidX recyclerview 1.3.2
-- Material Components 1.12.0
+- AGP 9.4.1
+- Gradle 9.7.1
+- AndroidX appcompat 1.8.0
+- AndroidX recyclerview 1.4.0
+- Material Components 1.14.0
 - AndroidX constraintlayout 2.1.4
-- compileSdk 34, minSdk 24, targetSdk 34
+- compileSdk 37.2, minSdk 24, targetSdk 34

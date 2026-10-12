@@ -12,7 +12,9 @@ pluginManagement {
 }
 
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    // Aligné sur CodeIDE : aucun dépôt déclaré au niveau projet (mode
+    // strict) — la résolution passe intégralement par ce bloc.
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         google()
         mavenCentral()

@@ -6,19 +6,28 @@
 # @since 3.0
 
 [versions]
-# Build
-agp = "8.5.0"
+# Build — aligné sur CodeIDE (décision propriétaire 2026-10-13) pour un
+# environnement unique : même Gradle 9.7.1 (wrapper), même JDK 21, mêmes
+# versions AGP/AndroidX → démon Gradle et caches partagés entre les deux
+# dépôts, et compatibilité du build composite (CodeIDE consomme LayoutLib
+# par includeBuild + substitution, plus de JitPack).
+agp = "9.4.1"
 
-# AndroidX / Material
-androidxAnnotation = "1.8.0"
-androidxCore = "1.13.1"
-androidxAppcompat = "1.7.0"
-androidxRecyclerview = "1.3.2"
+# AndroidX / Material — versions partagées avec CodeIDE
+# (gradle/libs.versions.toml de CodeIDE = source de vérité).
+androidxAnnotation = "1.10.0"
+androidxCore = "1.19.0"
+androidxAppcompat = "1.8.0"
+androidxRecyclerview = "1.4.0"
 androidxConstraintlayout = "2.1.4"
-material = "1.12.0"
+material = "1.14.0"
 
 # Tests JVM
 junitJupiter = "5.10.2"
+# Gradle 9 exige le lanceur JUnit Platform EXPLICITE sur le classpath
+# de test (Gradle 8 l'ajoutait implicitement) — version alignée sur la
+# plateforme de jupiter 5.10.2 (série 1.10.2).
+junitPlatformLauncher = "1.10.2"
 assertj = "3.26.0"
 kxml2 = "2.3.0"
 mockito = "5.14.2"
@@ -28,8 +37,10 @@ androidxTestExtJunit = "1.1.5"
 androidxTestRunner = "1.5.2"
 espressoCore = "3.5.1"
 
-# Externe : github.com/jjoblab/code-editor (JitPack, tag Git)
-codeEditor = "v3.41.0"
+# Externe : github.com/jjoblab/code-editor (JitPack, tag Git) — même
+# version que CodeIDE (compatibilité vérifiée 3.41.0 → 3.49.2 : ajouts
+# purs d'API, aucune méthode publique retirée).
+codeEditor = "3.49.2"
 
 [libraries]
 # AndroidX / Material
@@ -42,7 +53,9 @@ material = { module = "com.google.android.material:material", version.ref = "mat
 
 # Tests JVM — junit-jupiter (agrégat api+params+engine) suffit pour
 # testImplementation ; plus besoin de déclarer api/engine séparément.
+# Le lanceur (testRuntimeOnly) : exigence Gradle 9, voir [versions].
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junitJupiter" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junitPlatformLauncher" }
 assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
 kxml2 = { module = "net.sf.kxml:kxml2", version.ref = "kxml2" }
 mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }

@@ -3,7 +3,11 @@
 # @since 3.0
 #
 # Vérifie à chaque push/PR : tests JVM de tous les modules, build debug
-# de l'application et lint. JDK 17 requis (AGP 8.5).
+# de l'application et lint.
+#
+# Environnement ALIGNÉ sur CodeIDE (décision propriétaire 2026-10-13) :
+# JDK 21 (Temurin), Gradle 9.7.1 (wrapper), AGP 9.4.1, compileSdk 37 —
+# un seul outillage pour les deux dépôts.
 
 name: CI
 
@@ -22,14 +26,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '21'
 
       - name: Setup Gradle (cache)
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v4
+
+      # Même rite que CodeIDE : les licences du SDK préinstallé du runner
+      # sont déjà acceptées ; ceci permet à sdkmanager d'auto-installer la
+      # plateforme 37 si elle manque (compileSdk 37).
+      - name: Accepter les licences du SDK Android
+        run: yes | sdkmanager --licenses >/dev/null || true
 
       - name: Tests unitaires (tous modules)
         run: ./gradlew testAllModules --console=plain

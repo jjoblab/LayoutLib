@@ -8,7 +8,8 @@ plugins {
 
 android {
     namespace = "jo.layoutlib.inflater"
-    compileSdk = 34
+    compileSdk = 37
+    compileSdkMinor = 2
 
     defaultConfig {
         minSdk = 24
@@ -16,8 +17,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     testOptions {
@@ -44,6 +45,7 @@ dependencies {
 
     // Tests unitaires JVM (JUnit 5)
     testImplementation(libs.junit.jupiter)
+    testRuntimeOnly(libs.junit.platform.launcher)
     testImplementation(libs.assertj.core)
     testImplementation(libs.kxml2)
     testImplementation(libs.mockito.core)
