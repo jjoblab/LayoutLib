@@ -1,10 +1,17 @@
 package jo.layoutlib.drawables;
 
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
+import android.graphics.PorterDuff;
+import android.graphics.Shader;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.InsetDrawable;
+import android.graphics.drawable.LayerDrawable;
+import android.graphics.drawable.RippleDrawable;
 import android.graphics.drawable.StateListDrawable;
 
 import org.xmlpull.v1.XmlPullParser;
@@ -77,6 +84,18 @@ public class DrawableResolverImpl implements DrawableResolver {
     /** Parser de vectors. */
     private final VectorParser vectorParser;
 
+    /** Parser de layer-lists. */
+    private final LayerListParser layerListParser;
+
+    /** Parser de ripples. */
+    private final RippleParser rippleParser;
+
+    /** Parser d'insets. */
+    private final InsetParser insetParser;
+
+    /** Parser de bitmaps. */
+    private final BitmapParser bitmapParser;
+
     /**
      * Construit un resolver avec un résolveur de resources et convertisseur.
      *
@@ -90,6 +109,10 @@ public class DrawableResolverImpl implements DrawableResolver {
         this.shapeParser = new ShapeParser(dimensionConverter);
         this.selectorParser = new SelectorParser();
         this.vectorParser = new VectorParser(dimensionConverter);
+        this.layerListParser = new LayerListParser(dimensionConverter);
+        this.rippleParser = new RippleParser();
+        this.insetParser = new InsetParser(dimensionConverter);
+        this.bitmapParser = new BitmapParser();
     }
 
     /**
@@ -187,17 +210,13 @@ public class DrawableResolverImpl implements DrawableResolver {
             case "color":
                 return createColorDrawable(xml);
             case "layer-list":
-                // Pas implémenté en v1 — retourne null
-                return null;
+                return createLayerListDrawable(xml, context);
             case "ripple":
-                // Pas implémenté en v1 — retourne null
-                return null;
+                return createRippleDrawable(xml, context);
             case "inset":
-                // Pas implémenté en v1 — retourne null
-                return null;
+                return createInsetDrawable(xml, context);
             case "bitmap":
-                // Pas implémenté en v1 — retourne null
-                return null;
+                return createBitmapDrawable(xml, context);
             default:
                 return null;
         }
@@ -233,6 +252,18 @@ public class DrawableResolverImpl implements DrawableResolver {
                 break;
             case "vector":
                 config = vectorParser.parse(xml);
+                break;
+            case "layer-list":
+                config = layerListParser.parse(xml);
+                break;
+            case "ripple":
+                config = rippleParser.parse(xml);
+                break;
+            case "inset":
+                config = insetParser.parse(xml);
+                break;
+            case "bitmap":
+                config = bitmapParser.parse(xml);
                 break;
             default:
                 config = null;
@@ -509,6 +540,329 @@ public class DrawableResolverImpl implements DrawableResolver {
             return null;
         }
         return null;
+    }
+
+    /**
+     * Crée un LayerDrawable à partir d'un XML de layer-list.
+     *
+     * <p>Chaque {@code <item>} est résolu : les références
+     * ({@code @drawable/}, {@code @color/}, littérales) passent par
+     * {@link #resolveChildDrawable(String, Context)}, et les drawables
+     * inline (shape, selector, vector, color imbriqués) sont re-parsés
+     * récursivement. Les insets éventuels
+     * ({@code android:left/top/right/bottom}) sont appliqués par calque.
+     * Un calque non résolvable est ignoré — jamais d'exception qui casserait
+     * le rendu entier (philosophie placeholder neutre) ; si aucun calque ne
+     * résout, retourne {@code null}.</p>
+     *
+     * @param xml     le XML source
+     * @param context le contexte Android (peut être {@code null} en JVM)
+     * @return le LayerDrawable, ou {@code null}
+     */
+    private Drawable createLayerListDrawable(String xml, Context context) {
+        LayerListConfig config;
+        try {
+            config = layerListParser.parse(xml);
+        } catch (DrawableException e) {
+            return null;
+        }
+        if (config.getItemCount() == 0) {
+            return null;
+        }
+        List<Drawable> layers = new ArrayList<>();
+        List<LayerListConfig.LayerItem> appliedItems = new ArrayList<>();
+        for (LayerListConfig.LayerItem item : config.getItems()) {
+            Drawable child = resolveLayerChild(item.getDrawableRef(),
+                    item.getNestedXml(), context);
+            if (child == null) {
+                continue;
+            }
+            layers.add(child);
+            appliedItems.add(item);
+        }
+        if (layers.isEmpty()) {
+            return null;
+        }
+        try {
+            LayerDrawable layerDrawable =
+                    new LayerDrawable(layers.toArray(new Drawable[0]));
+            for (int i = 0; i < appliedItems.size(); i++) {
+                LayerListConfig.LayerItem item = appliedItems.get(i);
+                if (item.hasAnyInset()) {
+                    layerDrawable.setLayerInset(i,
+                            toPx(item.getInsetLeft()), toPx(item.getInsetTop()),
+                            toPx(item.getInsetRight()), toPx(item.getInsetBottom()));
+                }
+            }
+            return layerDrawable;
+        } catch (RuntimeException e) {
+            // Drawables null dans le tableau (JVM) — repli silencieux
+            return null;
+        }
+    }
+
+    /**
+     * Crée un RippleDrawable à partir d'un XML de ripple.
+     *
+     * <p>La couleur {@code android:color} est obligatoire. Le contenu et le
+     * masque ({@code <item android:id="@android:id/mask">}) sont optionnels
+     * et résolus comme les calques d'un layer-list. Sans couleur, retourne
+     * {@code null} (un ripple sans couleur n'a aucun effet visible).</p>
+     *
+     * @param xml     le XML source
+     * @param context le contexte Android (peut être {@code null} en JVM)
+     * @return le RippleDrawable, ou {@code null}
+     */
+    private Drawable createRippleDrawable(String xml, Context context) {
+        RippleConfig config;
+        try {
+            config = rippleParser.parse(xml);
+        } catch (DrawableException e) {
+            return null;
+        }
+        if (!config.hasColor()) {
+            return null;
+        }
+        Drawable content = resolveLayerChild(
+                config.getContent() != null ? config.getContent().getDrawableRef() : null,
+                config.getContent() != null ? config.getContent().getNestedXml() : null,
+                context);
+        Drawable mask = resolveLayerChild(
+                config.getMask() != null ? config.getMask().getDrawableRef() : null,
+                config.getMask() != null ? config.getMask().getNestedXml() : null,
+                context);
+        try {
+            return new RippleDrawable(
+                    ColorStateList.valueOf(config.getColor()), content, mask);
+        } catch (RuntimeException e) {
+            // ColorStateList null en JVM de test — repli silencieux
+            return null;
+        }
+    }
+
+    /**
+     * Crée un InsetDrawable à partir d'un XML d'inset.
+     *
+     * <p>Le drawable enfant ({@code android:drawable} ou inline) est
+     * obligatoire : sans lui, l'inset n'encadre rien et retourne
+     * {@code null}. Les quatre insets sont appliqués en pixels.</p>
+     *
+     * @param xml     le XML source
+     * @param context le contexte Android (peut être {@code null} en JVM)
+     * @return le InsetDrawable, ou {@code null}
+     */
+    private Drawable createInsetDrawable(String xml, Context context) {
+        InsetConfig config;
+        try {
+            config = insetParser.parse(xml);
+        } catch (DrawableException e) {
+            return null;
+        }
+        Drawable child = resolveLayerChild(config.getDrawableRef(),
+                config.getNestedXml(), context);
+        if (child == null) {
+            return null;
+        }
+        try {
+            return new InsetDrawable(child,
+                    toPx(config.getInsetLeft()), toPx(config.getInsetTop()),
+                    toPx(config.getInsetRight()), toPx(config.getInsetBottom()));
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Crée un BitmapDrawable (ou ColorDrawable pour une source couleur) à
+     * partir d'un XML de bitmap.
+     *
+     * <p>La source {@code android:src} est résolue : fichier image →
+     * {@link BitmapDrawable} avec tuilage ({@code tileMode/tileModeX/Y}),
+     * gravité et drapeaux de qualité appliqués ; couleur
+     * ({@code @color/} ou littérale) → {@link ColorDrawable} avec alpha et
+     * tint. En JVM de test (pas de Resources réel), le décodage d'image
+     * échoue silencieusement → {@code null}.</p>
+     *
+     * @param xml     le XML source
+     * @param context le contexte Android (peut être {@code null} en JVM)
+     * @return le drawable, ou {@code null}
+     */
+    private Drawable createBitmapDrawable(String xml, Context context) {
+        BitmapConfig config;
+        try {
+            config = bitmapParser.parse(xml);
+        } catch (DrawableException e) {
+            return null;
+        }
+        if (!config.hasSource()) {
+            return null;
+        }
+        String srcRef = config.getSrcRef();
+        Drawable drawable = null;
+
+        if (srcRef.startsWith("#") || srcRef.startsWith("@color/")) {
+            Integer color = null;
+            if (srcRef.startsWith("#")) {
+                try {
+                    color = ColorParser.parse(srcRef);
+                } catch (ResourceException ignored) {
+                    color = null;
+                }
+            } else if (resourceResolver != null) {
+                color = resourceResolver.getColor(srcRef);
+            }
+            if (color != null) {
+                drawable = new ColorDrawable(color);
+            }
+        } else if (srcRef.startsWith("@drawable/") && resourceResolver != null) {
+            String path = resourceResolver.getDrawablePath(srcRef);
+            if (path != null && !path.endsWith(".xml")) {
+                drawable = loadBitmapDrawable(path, context);
+            } else if (path != null) {
+                // Source pointant vers un drawable XML — délégation récursive
+                drawable = resolveLayerChild(srcRef, null, context);
+            }
+        }
+        if (drawable == null) {
+            return null;
+        }
+
+        if (drawable instanceof BitmapDrawable) {
+            BitmapDrawable bitmapDrawable = (BitmapDrawable) drawable;
+            Shader.TileMode tileX = toTileMode(firstNonNull(
+                    config.getTileModeX(), config.getTileMode()));
+            Shader.TileMode tileY = toTileMode(firstNonNull(
+                    config.getTileModeY(), config.getTileMode()));
+            if (tileX != null || tileY != null) {
+                bitmapDrawable.setTileModeXY(
+                        tileX != null ? tileX : Shader.TileMode.CLAMP,
+                        tileY != null ? tileY : Shader.TileMode.CLAMP);
+            }
+            if (config.getGravity() != null) {
+                bitmapDrawable.setGravity(config.getGravity());
+            }
+            if (config.getAntialias() != null) {
+                bitmapDrawable.setAntiAlias(config.getAntialias());
+            }
+            if (config.getDither() != null) {
+                bitmapDrawable.setDither(config.getDither());
+            }
+            if (config.getFilter() != null) {
+                bitmapDrawable.setFilterBitmap(config.getFilter());
+            }
+        }
+        if (config.getAlpha() != null) {
+            drawable.setAlpha(Math.round(config.getAlpha() * 255f));
+        }
+        Integer tint = parseTintColor(config.getTint());
+        if (tint != null) {
+            drawable.setTint(tint);
+            PorterDuff.Mode mode = toTintMode(config.getTintMode());
+            if (mode != null) {
+                drawable.setTintMode(mode);
+            }
+        }
+        return drawable;
+    }
+
+    /**
+     * Résout un enfant de drawable composite : référence d'abord, XML
+     * imbriqué ensuite.
+     *
+     * @param ref      la référence ({@code @drawable/…}, {@code @color/…},
+     *                 littérale), ou {@code null}
+     * @param nestedXml le XML inline capturé, ou {@code null}
+     * @param context  le contexte Android
+     * @return le drawable enfant, ou {@code null} si non résolvable
+     */
+    private Drawable resolveLayerChild(String ref, String nestedXml, Context context) {
+        if (ref != null && !ref.isEmpty()) {
+            return resolveChildDrawable(ref, context);
+        }
+        if (nestedXml != null && !nestedXml.isEmpty()) {
+            try {
+                return parse(nestedXml, context);
+            } catch (RuntimeException e) {
+                // Un enfant cassé ne doit pas casser le composite entier
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Convertit un Float éventuellement null en pixels int.
+     */
+    private static int toPx(Float value) {
+        return value != null ? Math.round(value) : 0;
+    }
+
+    /**
+     * Retourne le premier non-null des deux valeurs.
+     */
+    private static <T> T firstNonNull(T first, T second) {
+        return first != null ? first : second;
+    }
+
+    /**
+     * Convertit une valeur de tileMode en {@link Shader.TileMode}.
+     *
+     * @param value la valeur brute ({@code clamp}, {@code repeat},
+     *              {@code mirror}, {@code disabled})
+     * @return le mode, ou {@code null} pour absent/disabled
+     */
+    private static Shader.TileMode toTileMode(String value) {
+        if (value == null || value.isEmpty()) {
+            return null;
+        }
+        switch (value.toLowerCase()) {
+            case "clamp":   return Shader.TileMode.CLAMP;
+            case "repeat":  return Shader.TileMode.REPEAT;
+            case "mirror":  return Shader.TileMode.MIRROR;
+            default:        return null; // "disabled" et inconnus : pas de tuilage
+        }
+    }
+
+    /**
+     * Convertit une valeur de tintMode en {@link PorterDuff.Mode}.
+     *
+     * @param value la valeur brute ({@code src_over}, {@code multiply}, …)
+     * @return le mode, ou {@code null} si absent/inconnu
+     */
+    private static PorterDuff.Mode toTintMode(String value) {
+        if (value == null || value.isEmpty()) {
+            return null;
+        }
+        switch (value.toLowerCase()) {
+            case "src_over": return PorterDuff.Mode.SRC_OVER;
+            case "src_in":   return PorterDuff.Mode.SRC_IN;
+            case "src_atop": return PorterDuff.Mode.SRC_ATOP;
+            case "multiply": return PorterDuff.Mode.MULTIPLY;
+            case "screen":   return PorterDuff.Mode.SCREEN;
+            case "add":      return PorterDuff.Mode.ADD;
+            case "clear":    return PorterDuff.Mode.CLEAR;
+            default:         return null;
+        }
+    }
+
+    /**
+     * Parse une couleur de tint (littérale ou {@code @color/}).
+     *
+     * @param value la valeur brute
+     * @return la couleur, ou {@code null} si non résolvable
+     */
+    private Integer parseTintColor(String value) {
+        if (value == null || value.isEmpty()) {
+            return null;
+        }
+        if (value.startsWith("@color/") && resourceResolver != null) {
+            return resourceResolver.getColor(value);
+        }
+        try {
+            return ColorParser.parse(value);
+        } catch (ResourceException e) {
+            return null;
+        }
     }
 
     /**
