@@ -7,7 +7,7 @@
 
 ## Responsabilité
 
-Parser les fichiers XML de resources du projet Android (`res/values/*.xml`) et exposer une API de résolution des références avec support des qualifiers (jour/nuit, portrait/paysage, niveau d'API) et des références chainables.
+Parser les fichiers XML de resources du projet Android (`res/values/*.xml`) et exposer une API de résolution des références avec support des qualifiers (langue/région, jour/nuit, portrait/paysage, niveau d'API) et des références chainables.
 
 ## Classes
 
@@ -34,6 +34,8 @@ ResourceResolver resolver = new ResourceResolverImpl("/path/to/res");
 resolver.setNightMode(true);
 resolver.setLandscape(false);
 resolver.setApiLevel(31);
+resolver.setLanguage("fr");        // values-fr/ (repli auto sur values/)
+resolver.setLocale("fr", "FR");    // variante régionale values-fr-rFR/
 
 // Résolution
 Integer color = resolver.getColor("@color/primary");
@@ -49,6 +51,8 @@ String drawablePath = resolver.getDrawablePath("@drawable/icon");
 
 - ✅ Parsing `colors.xml`, `strings.xml`, `dimens.xml`, `integers.xml`, `bools.xml`
 - ✅ Support des qualifiers `values-night/`, `values-land/`, `values-v31/`
+- ✅ Support des qualifiers de langue `values-fr/`, `values-en/`, `values-fr-rFR/` (et BCP47 `b+fr`) avec repli automatique sur `values/`
+- ✅ Priorité AOSP : locale > mode nuit > orientation > niveau d'API
 - ✅ Résolution chainable : `<color name="primary">@color/purple_500</color>`
 - ✅ Cache LRU (512 entrées par défaut, configurable)
 - ✅ Couleurs hex 8/6/4/3 chiffres + couleurs nommées (red, blue, transparent, ...)
@@ -64,13 +68,16 @@ String drawablePath = resolver.getDrawablePath("@drawable/icon");
 |------|---------|---------------|
 | JVM | `ColorParserTest` | 18 |
 | JVM | `ResourceQualifierTest` | 12 |
+| JVM | `ResourceQualifierLocaleTest` | 26 |
 | JVM | `DimensionConverterTest` | 14 |
 | JVM | `ResourceFileParserTest` | 13 |
 | JVM | `ResourceResolverImplTest` | 20 |
+| JVM | `ResourceResolverImplLocaleTest` | 15 |
 | JVM | `ResourceCacheTest` | 9 |
 | JVM | `ResourceTableTest` | 11 |
+| JVM | `ResourceStringArrayTest` | 6 |
 | Instrumenté | `ResourceResolverImplInstrumentedTest` | 10 |
-| **Total** | | **107 cas** |
+| **Total** | | **154 cas** |
 
 ## Exécution
 
@@ -89,7 +96,6 @@ String drawablePath = resolver.getDrawablePath("@drawable/icon");
 
 ## Limitations v1.0
 
-- ❌ Pas de support des `<string-array>` et `<plurals>` (stockés mais non exposés via l'API)
+- ❌ Pas de support des `<plurals>` (les `<string-array>` sont exposés)
 - ❌ Pas de support des qualifiers `w600dp`, `h720dp`, `sw600dp` (largeur/hauteur minimale)
-- ❌ Pas de support des qualifiers de langue (`values-fr/`, `values-en/`)
 - ❌ Pas de résolution des références `?attr/foo` (gérées par Module 4 — Themes)

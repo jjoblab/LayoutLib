@@ -124,6 +124,19 @@ public interface ResourceResolver {
     void setApiLevel(int apiLevel);
 
     /**
+     * Définit la locale simulée (pour les qualifiers {@code values-<lang>/}).
+     *
+     * <p>Après cet appel, les resources localisées (ex.
+     * {@code res/values-fr/strings.xml}) l'emportent sur les resources par
+     * défaut ({@code res/values/}), avec repli automatique sur la défaut
+     * quand la traduction manque.</p>
+     *
+     * @param language la langue ISO 639 (ex. {@code "fr"}, {@code "en"}),
+     *                 ou {@code null} pour revenir à la locale par défaut
+     */
+    void setLanguage(String language);
+
+    /**
      * Vide le cache des valeurs résolues.
      */
     void clearCache();

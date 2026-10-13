@@ -520,6 +520,32 @@ public class ResourceResolverImpl implements ResourceResolver {
         clearCache();
     }
 
+    @Override
+    public void setLanguage(String language) {
+        this.currentQualifier = new ResourceQualifier(
+                currentQualifier.isNight(), currentQualifier.isLandscape(),
+                currentQualifier.getApiLevel(), language, null);
+        clearCache();
+    }
+
+    /**
+     * Définit la locale simulée complète (langue + région).
+     *
+     * <p>Variant régionale de {@link #setLanguage(String)} : les resources
+     * {@code values-fr-rFR/} nécessitent une cible région FR pour être
+     * sélectionnées ; les resources {@code values-fr/} restent
+     * compatibles avec toute région.</p>
+     *
+     * @param language la langue ISO 639, ou {@code null}
+     * @param region   la région ISO 3166 (ex. {@code "FR"}), ou {@code null}
+     */
+    public void setLocale(String language, String region) {
+        this.currentQualifier = new ResourceQualifier(
+                currentQualifier.isNight(), currentQualifier.isLandscape(),
+                currentQualifier.getApiLevel(), language, region);
+        clearCache();
+    }
+
     /**
      * Définit le convertisseur de dimensions à utiliser.
      *
