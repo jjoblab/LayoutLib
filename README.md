@@ -4,7 +4,7 @@
 >
 > **Auteur :** `jo@Dev` (toutes les Javadoc)
 > **Langue des Javadoc :** Français
-> **Version :** 2.2.0 — Alignée sur l'architecture AOSP layoutlib ; toolchain alignée sur CodeIDE (Gradle 9.7.1, AGP 9.4.1, JDK 21, compileSdk 37.2)
+> **Version :** 3.0.0 — ADR 0116 livré : drawables composites (layer-list/ripple/inset/bitmap), qualifiers de langue (values-fr/values-en), solver Cassowary câblé à ConstraintLayout ; toolchain alignée sur CodeIDE (Gradle 9.7.1, AGP 9.4.1, JDK 21, compileSdk 37.2)
 > **Cible :** Android minSdk 24, compileSdk 37.2, Java 17
 > **Référence AOSP :** https://android.googlesource.com/platform/frameworks/layoutlib
 
