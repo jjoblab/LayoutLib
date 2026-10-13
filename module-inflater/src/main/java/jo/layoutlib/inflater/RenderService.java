@@ -12,9 +12,12 @@ import org.xmlpull.v1.XmlPullParserFactory;
 
 import java.io.IOException;
 import java.io.StringReader;
+import java.util.HashMap;
+import java.util.Map;
 
 import jo.layoutlib.drawables.DrawableResolver;
 import jo.layoutlib.inflater.bridge.util.Debug;
+import jo.layoutlib.layout.ConstraintSolver;
 import jo.layoutlib.layout.LayoutEngineImpl;
 import jo.layoutlib.resources.DimensionConverter;
 import jo.layoutlib.resources.ResourceResolver;
@@ -427,6 +430,14 @@ public class RenderService {
             int height = targetHeight > 0 ? targetHeight : 1920;
             layoutEngine.render(root, width, height);
 
+            // ÉTAPE 3bis : Résolution des contraintes ConstraintLayout
+            // (ADR 0116 — P2/L9) : les vues portant des attributs
+            // app:layout_constraint* sont positionnées par le solver
+            // Cassowary (chaînes, guidelines, barrières, ratios), avec
+            // repli interne sur l'algorithme historique si le système
+            // échoue.
+            applyConstraintLayouts(root, width, height);
+
             // ÉTAPE 4 : Compter les vues
             int viewCount = countViews(root);
 
@@ -564,5 +575,82 @@ public class RenderService {
 
     public boolean hasValidRender() {
         return hasValidRender;
+    }
+
+    /**
+     * Applique la résolution de contraintes ConstraintLayout sur l'arbre
+     * rendu (ADR 0116 — P2/L9).
+     *
+     * <p>Pour chaque {@link ViewGroup} dont les enfants portent des
+     * attributs {@code app:layout_constraint*} (capturés à l'inflation,
+     * exposés via {@link BridgeInflater#getConstraintAttributes()}), un
+     * {@link ConstraintSolver} est construit et résout les positions via le
+     * solver Cassowary : chaînes (spread/packed/pondérée), guidelines,
+     * barrières, ratios {@code layout_constraintDimensionRatio}, biais et
+     * {@code match_constraint} (0dp). Le solver retombe de lui-même sur
+     * l'algorithme historique en cas d'échec — cette méthode ne lève
+     * jamais.</p>
+     *
+     * @param root   la vue racine rendue (mesurée et layoutée)
+     * @param width  largeur du rendu en pixels
+     * @param height hauteur du rendu en pixels
+     */
+    private void applyConstraintLayouts(View root, int width, int height) {
+        try {
+            Map<View, Map<String, String>> attributes =
+                    inflater.getConstraintAttributes();
+            if (attributes.isEmpty()) {
+                return;
+            }
+            solveConstraints(root, attributes, width, height);
+        } catch (RuntimeException e) {
+            // La résolution de contraintes ne doit jamais casser le rendu
+            Debug.logWarning("render",
+                    "Résolution ConstraintLayout ignorée : " + e);
+        }
+    }
+
+    /**
+     * Parcourt l'arbre et résout les contraintes des enfants de chaque
+     * ViewGroup concerné.
+     */
+    private void solveConstraints(View view,
+                                  Map<View, Map<String, String>> attributes,
+                                  int parentWidth, int parentHeight) {
+        if (!(view instanceof ViewGroup)) {
+            return;
+        }
+        ViewGroup group = (ViewGroup) view;
+        Map<View, Map<String, String>> children = new HashMap<>();
+        for (int i = 0; i < group.getChildCount(); i++) {
+            View child = group.getChildAt(i);
+            Map<String, String> attrs = attributes.get(child);
+            if (attrs != null) {
+                children.put(child, attrs);
+            }
+        }
+        if (!children.isEmpty()) {
+            ConstraintSolver solver = new ConstraintSolver();
+            for (Map.Entry<View, Map<String, String>> e : children.entrySet()) {
+                View child = e.getKey();
+                solver.registerView(child, resolveConstraintId(child), e.getValue(),
+                        child.getMeasuredWidth(), child.getMeasuredHeight());
+            }
+            int groupWidth = group.getWidth() > 0 ? group.getWidth() : parentWidth;
+            int groupHeight = group.getHeight() > 0 ? group.getHeight() : parentHeight;
+            solver.solve(groupWidth, groupHeight);
+        }
+        for (int i = 0; i < group.getChildCount(); i++) {
+            solveConstraints(group.getChildAt(i), attributes,
+                    parentWidth, parentHeight);
+        }
+    }
+
+    /**
+     * Retrouve l'id déclaratif d'une vue contrainte (suffixe nu, ex.
+     * {@code button_save}) depuis la map de l'inflater.
+     */
+    private String resolveConstraintId(View view) {
+        return inflater.getConstraintViewIds().get(view);
     }
 }
