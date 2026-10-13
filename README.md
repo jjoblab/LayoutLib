@@ -20,7 +20,9 @@ Android Studio utilise `layoutlib` (~85 000 lignes, ~400 classes) pour afficher 
 LayoutLib/
 ├── module-inflater/          ← Module 1 : XML parser → View tree          ✅ Intégré au pipeline
 ├── module-resources/         ← Module 2 : @color/, @string/, @dimen/      ✅ Intégré au pipeline
-├── module-drawables/         ← Module 3 : <shape>, <selector>, <vector>   ✅ Intégré au pipeline
+├── module-drawables/         ← Module 3 : <shape>, <selector>, <vector>,
+│                                             <layer-list>, <ripple>, <inset>,
+│                                             <bitmap>                    ✅ Intégré au pipeline
 ├── module-themes/            ← Module 4 : themes.xml, ?attr/              ✅ Intégré au pipeline
 ├── module-attributes/        ← Module 5 : <declare-styleable>, app:*      ✅ Intégré (mode strict)
 ├── module-layout/            ← Module 6 : measure/layout engine           ✅ Intégré au pipeline
@@ -39,7 +41,7 @@ Package principal : `jo.layoutlib` (un sous-package par module : `jo.layoutlib.i
 |--------|--------|---------|------------------------------|
 | Module 1 — Inflater | ✅ Intégré | 85 classes | Cœur du pipeline (`RenderService`, `BridgeInflater`, `AttributeApplier` par famille de widgets) |
 | Module 2 — Resources | ✅ Intégré | 96 classes | `ResourceResolver` consulté pour `@color/`, `@string/`, `@dimen/`, `@array/` |
-| Module 3 — Drawables | ✅ Intégré | 15 classes | `DrawableResolver` consulté pour `@drawable/` (shapes, selectors, vectors) |
+| Module 3 — Drawables | ✅ Intégré | 24 classes | `DrawableResolver` consulté pour `@drawable/` (shapes, selectors, vectors, layer-lists, ripples, insets, bitmaps) |
 | Module 4 — Themes | ✅ Intégré | 34 classes | `ThemeResolver` consulté pour `?attr/` (repli sur le thème natif) |
 | Module 5 — Attributes | ✅ Intégré | 41 classes | `AttributeRegistry` pilote le mode strict du `BridgeInflater` |
 | Module 6 — Layout | ✅ Intégré | 42 classes | `LayoutEngineImpl` fait la mesure + le layout de chaque rendu |
