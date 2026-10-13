@@ -1,9 +1,9 @@
 # Module 6 — Layout Engine
 
-> Wrapper autour de `View.measure()` et `View.layout()` avec gestion fine des `MeasureSpec`.
+> Wrapper autour de `View.measure()` et `View.layout()` avec gestion fine des `MeasureSpec` + résolution de contraintes ConstraintLayout via le solver Cassowary.
 >
 > @author jo@Dev
-> **Statut :** ✅ Livré (Phase 6)
+> **Statut :** ✅ Livré (Phase 6 — Cassowary câblé en 3.0, ADR 0116 P2/L9)
 
 ## Classes
 
@@ -11,8 +11,11 @@
 |--------|--------|------|
 | `LayoutEngine` | ~50 | Interface |
 | `LayoutEngineImpl` | ~170 | Implémentation avec MeasureSpec builder |
+| `ConstraintSpec` | ~600 | Instantané des attributs `app:layout_constraint*` (ancres, biais, ratios, chaînes, guideline/barrier) |
+| `ConstraintSolver` | ~1400 | Résolution ConstraintLayout : système Cassowary + repli legacy |
+| `cassowary/*` | ~700 | Solver Cassowary (variables, expressions, contraintes, forces) |
 | `LayoutException` | ~15 | Exception |
-| **Total** | **~235** | |
+| **Total** | **~2900** | |
 
 ## API publique
 
@@ -33,6 +36,12 @@ engine.render(rootView, 1080, 1920);
 
 // Configurer les DisplayMetrics d'un contexte
 engine.configureDisplayMetrics(context.getResources().getDisplayMetrics());
+
+// Contraintes ConstraintLayout (solver Cassowary)
+ConstraintSolver solver = new ConstraintSolver();
+solver.registerView(vue, "vue_a", attributesMap);  // map capturée à l'inflation
+boolean cassowary = solver.solve(1080, 1920);      // true si Cassowary a abouti
+int[] bornes = solver.getSolvedBounds(vue);        // {left, top, right, bottom}
 ```
 
 ## Fonctionnalités
@@ -44,6 +53,14 @@ engine.configureDisplayMetrics(context.getResources().getDisplayMetrics());
 - ✅ Gestion dimensions fixes → `EXACTLY`
 - ✅ Configuration densité + fontScale + xdpi
 - ✅ Configuration des `DisplayMetrics` d'un contexte
+- ✅ Résolution ConstraintLayout via Cassowary (3.0) : ancres
+  parent/vue/guideline/barrier, biais, pourcentages, ratios
+  (`16:9`, `W,16:9`, `H,1:2`), chaînes (`spread`/`spread_inside`/`packed`/
+  pondérée), guidelines (`begin`/`end`/`percent`), barrières (2 passes),
+  `match_constraint` (0dp)
+- ✅ Repli automatique sur l'algorithme historique si le système échoue
+  (contraintes circulaires, valeurs non finies) — le rendu n'est jamais
+  pire qu'avant
 
 ## Algorithme de MeasureSpec
 
@@ -65,13 +82,18 @@ buildMeasureSpec(targetSize, lp, isWidth):
 
 | Type | Fichier | Cas |
 |------|---------|-----|
+| JVM | `cassowary/SolverTest` | 8 |
+| JVM | `ConstraintSolverCassowaryTest` | 32 |
 | Instrumenté | `LayoutEngineImplInstrumentedTest` | 11 |
-| **Total** | | **11 cas** |
+| **Total** | | **51 cas** |
 
-## Limitations v1.0
+## Limitations
 
 - ❌ Pas de hook `LayoutInflater.Factory2`
 - ❌ Pas de gestion `LayoutTransition` (animations de layout)
 - ❌ Pas de gestion `ViewTreeObserver` (callbacks)
-- ❌ Pas de solver Cassowary pour ConstraintLayout
-- ❌ Tests JVM purs non fournis (nécessitent des vues Android réelles)
+- ⚠️ Baseline ConstraintLayout : approximée (centre) au lieu du
+  `baseline` typographique réel
+- ⚠️ Le solver Cassowary est une relaxation min-norm (Gauss-Seidel),
+  pas le simplexe modifié de l'AOSP — convergence géométrique, repli
+  legacy en cas d'échec

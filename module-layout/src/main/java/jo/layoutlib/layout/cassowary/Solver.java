@@ -15,11 +15,16 @@ import java.util.Map;
  * contraintes plus faibles.</p>
  *
  * <h2>Algorithme</h2>
- * <p>Cette implémentation utilise une approche simplifiée :</p>
+ * <p>Cette implémentation utilise une relaxation exacte façon
+ * Gauss-Seidel :</p>
  * <ol>
  *   <li>Tri des contraintes par force décroissante</li>
- *   <li>Résolution itérative : pour chaque contrainte, on ajuste les
- *       variables pour la satisfaire si possible</li>
+ *   <li>Pour chaque contrainte non satisfaite, toutes les variables sont
+ *       ajustées simultanément par la solution de norme minimale
+ *       ({@code Δvᵢ = diff · cᵢ / Σcⱼ²}) — la contrainte est
+ *       satisfaite <em>exactement</em> après chaque relaxation, et les
+ *       systèmes symétriques ({@code x + y = 20} avec {@code x = y})
+ *       convergent en un balayage</li>
  *   <li>Pour les contraintes REQUIRED, échec si non satisfaisable</li>
  *   <li>Pour les contraintes plus faibles, on minimise la violation</li>
  * </ol>
@@ -132,9 +137,18 @@ public class Solver {
                 }
             }
 
-            if (allSatisfied || totalViolation < TOLERANCE) {
+            if (allSatisfied) {
                 solved = true;
                 return checkRequiredSatisfied(sorted);
+            }
+            // Sortie anticipée sur violation résiduelle faible UNIQUEMENT
+            // si les REQUIRED sont déjà exactement satisfaites : la
+            // tolérance de sortie (1e-6) est plus lâche que la tolérance de
+            // satisfaction EQ (1e-9), une REQUIRED peut donc rester violée
+            // de ~1e-7 alors que la violation totale est déjà < 1e-6.
+            if (totalViolation < TOLERANCE && checkRequiredSatisfied(sorted)) {
+                solved = true;
+                return true;
             }
         }
 
@@ -160,39 +174,61 @@ public class Solver {
     /**
      * Relaxe une contrainte en ajustant les variables.
      *
-     * <p>Pour chaque contrainte non satisfaite, on ajuste les variables
-     * proportionnellement à leurs coefficients pour rapprocher la
-     * contrainte de la satisfaction.</p>
+     * <p>Solution de norme minimale : toutes les variables sont ajustées
+     * simultanément par {@code Δvᵢ = diff · cᵢ / Σcⱼ²}. La somme
+     * {@code Σcᵢ·Δvᵢ = diff·Σcᵢ²/Σcⱼ² = diff} — la contrainte est
+     * donc satisfaite <em>exactement</em> après chaque relaxation, quelle
+     * que soit la répartition des coefficients. Les systèmes symétriques
+     * ({@code x + y = c}, {@code x = y}) convergent en un balayage, et les
+     * chaînes de dépendances (positions liées) convergent
+     * géométriquement.</p>
+     *
+     * <p>Pour les inégalités violées, l'ajustement est minimal : on ne
+     * déplace les variables que jusqu'à la frontière de satisfaction.</p>
      *
      * @param c la contrainte à relaxer
      */
     private void relaxConstraint(Constraint c) {
         Expression expr = c.getExpression();
         double value = expr.computeValue();
-        double target = c.getConstant();
-        double diff = target - value;
-
         List<Term> terms = expr.getTerms();
         if (terms.isEmpty()) {
             return;
         }
 
-        // Calcul du coefficient total absolu pour répartir l'ajustement
-        double totalAbsCoeff = 0;
-        for (Term t : terms) {
-            totalAbsCoeff += Math.abs(t.getCoefficient());
+        // Cible : satisfaction minimale (EQ → valeur exacte ; GEQ/LEQ →
+        // frontière uniquement si violée)
+        double target;
+        switch (c.getOperator()) {
+            case EQ:
+                target = c.getConstant();
+                break;
+            case GEQ:
+                target = Math.max(value, c.getConstant());
+                break;
+            case LEQ:
+                target = Math.min(value, c.getConstant());
+                break;
+            default:
+                return;
         }
-        if (totalAbsCoeff < TOLERANCE) {
+        double diff = target - value;
+        if (Math.abs(diff) < 1e-12) {
             return;
         }
 
-        // Ajustement de chaque variable
+        // Norme minimale : Δvᵢ = diff · cᵢ / Σcⱼ²
+        double sumSquares = 0;
+        for (Term t : terms) {
+            double coefficient = t.getCoefficient();
+            sumSquares += coefficient * coefficient;
+        }
+        if (sumSquares < TOLERANCE * TOLERANCE) {
+            return;
+        }
         for (Term t : terms) {
             Variable v = t.getVariable();
-            double coeff = t.getCoefficient();
-            // Ajustement proportionnel au coefficient
-            double adjustment = (diff * coeff) / totalAbsCoeff;
-            v.setValue(v.getValue() + adjustment);
+            v.setValue(v.getValue() + (diff * t.getCoefficient()) / sumSquares);
         }
     }
 

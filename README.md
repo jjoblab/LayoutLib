@@ -25,7 +25,10 @@ LayoutLib/
 │                                             <bitmap>                    ✅ Intégré au pipeline
 ├── module-themes/            ← Module 4 : themes.xml, ?attr/              ✅ Intégré au pipeline
 ├── module-attributes/        ← Module 5 : <declare-styleable>, app:*      ✅ Intégré (mode strict)
-├── module-layout/            ← Module 6 : measure/layout engine           ✅ Intégré au pipeline
+├── module-layout/            ← Module 6 : measure/layout engine +
+│                                             ConstraintLayout via solver
+│                                             Cassowary (chaînes, guidelines,
+│                                             barrières, ratios)      ✅ Intégré au pipeline
 ├── validation/               ← Tests de comparaison avec layoutlib        ✅ Livré
 └── layout-editor-app/        ← App d'édition visuelle de layouts (jo.layoutlib.editor)
 ```
@@ -44,7 +47,7 @@ Package principal : `jo.layoutlib` (un sous-package par module : `jo.layoutlib.i
 | Module 3 — Drawables | ✅ Intégré | 24 classes | `DrawableResolver` consulté pour `@drawable/` (shapes, selectors, vectors, layer-lists, ripples, insets, bitmaps) |
 | Module 4 — Themes | ✅ Intégré | 34 classes | `ThemeResolver` consulté pour `?attr/` (repli sur le thème natif) |
 | Module 5 — Attributes | ✅ Intégré | 41 classes | `AttributeRegistry` pilote le mode strict du `BridgeInflater` |
-| Module 6 — Layout | ✅ Intégré | 42 classes | `LayoutEngineImpl` fait la mesure + le layout de chaque rendu |
+| Module 6 — Layout | ✅ Intégré | 44 classes | `LayoutEngineImpl` fait la mesure + le layout ; `ConstraintSolver` (Cassowary) résout les contraintes ConstraintLayout |
 | Validation | ✅ Livré | 7 classes | Hors pipeline : catalogue de 50 layouts de comparaison |
 | layout-editor-app | ✅ Livré | 9 classes | Consomme l'ensemble (app d'édition visuelle, ouverture/SAF) |
 | **Total** | | **329 classes** | **~32 000 lignes** (main) |

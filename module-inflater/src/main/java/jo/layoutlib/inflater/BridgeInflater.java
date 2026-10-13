@@ -79,9 +79,13 @@ public class BridgeInflater {
     /** Applier d'attributs (lit XML et applique via setters natifs). */
     private AttributeApplier attributeApplier;
 
-    /** Contraintes ConstraintLayout collectées pendant l'inflation. */
+    /** Ids des vues contraintes ConstraintLayout (legacy, conservé pour compat). */
     private final Map<View, String> constraintViewIds = new HashMap<>();
-    private final Map<View, org.xmlpull.v1.XmlPullParser> constraintParsers = new HashMap<>();
+
+    /** Attributs de contrainte capturés pendant l'inflation (parser sur
+     *  START_TAG) : vue → map attribut → valeur. Consommé par le
+     *  ConstraintSolver (module-layout) via RenderService. */
+    private final Map<View, Map<String, String>> constraintAttributes = new HashMap<>();
 
     /** Map des vues indexées par id. */
     private final Map<Integer, View> idToView = new HashMap<>();
@@ -350,6 +354,13 @@ public class BridgeInflater {
         }
         view.setLayoutParams(lp);
 
+        // Capture des contraintes ConstraintLayout MAINTENANT — le parser
+        // est encore sur START_TAG (les attributs ne sont plus accessibles
+        // après parseChildren). Toute vue portant un attribut
+        // layout_constraint* / barrierDirection est enregistrée, avec son
+        // id et sa orientation déclarée (Guidelines/Barriers).
+        captureConstraintAttributes(view, parser);
+
         // Traitement récursif des enfants si la vue est un ViewGroup
         if (view instanceof ViewGroup) {
             ViewGroup viewGroup = (ViewGroup) view;
@@ -361,25 +372,6 @@ public class BridgeInflater {
         // Attachement au parent
         if (parent != null) {
             parent.addView(view, lp);
-        }
-
-        // Détecter si la vue a des contraintes ConstraintLayout
-        String constraintAttr = getAttributeValue(parser, "app", "layout_constraintTop_toTopOf");
-        if (constraintAttr == null) {
-            constraintAttr = getAttributeValue(parser, "app", "layout_constraintStart_toStartOf");
-        }
-        if (constraintAttr == null) {
-            constraintAttr = getAttributeValue(parser, "app", "layout_constraintLeft_toLeftOf");
-        }
-        if (constraintAttr != null) {
-            // Cette vue a des contraintes — stocker pour résolution post-inflation
-            String idName = getAttributeValue(parser, "android", "id");
-            if (idName != null) {
-                if (idName.startsWith("@+id/") || idName.startsWith("@id/")) {
-                    idName = idName.substring(idName.indexOf('/') + 1);
-                }
-                constraintViewIds.put(view, idName);
-            }
         }
 
         return view;
@@ -1284,7 +1276,7 @@ public class BridgeInflater {
         generatedIdCounter = 0x7f0a0001;
         viewFactory.clearCache();
         constraintViewIds.clear();
-        constraintParsers.clear();
+        constraintAttributes.clear();
     }
 
     /**
@@ -1299,5 +1291,109 @@ public class BridgeInflater {
      */
     public boolean hasConstraintViews() {
         return !constraintViewIds.isEmpty();
+    }
+
+    /**
+     * Capture les attributs de contrainte d'une vue pendant que le parser
+     * est sur son START_TAG.
+     *
+     * <p>Enregistre toute vue portant au moins un attribut
+     * {@code app:layout_constraint*}, {@code barrierDirection} ou
+     * {@code constraint_referenced_ids}, avec :
+     * <ul>
+     *   <li>son id déclaratif ({@code android:id}, suffixe nu) via
+     *       {@link #getConstraintViewIds()}</li>
+     *   <li>la map complète de ses attributs de contrainte (ancres, biais,
+     *       ratios, chaînes, marges, guideline/barrier, layout_width,
+     *       layout_height, orientation) via {@link #getConstraintAttributes()}</li>
+     * </ul>
+     * Le {@code ConstraintSolver} (module-layout) consomme ces maps après
+     * la passe de layout standard.</p>
+     *
+     * @param view   la vue créée
+     * @param parser le parser positionné sur le START_TAG de la vue
+     */
+    private void captureConstraintAttributes(View view, XmlPullParser parser) {
+        Map<String, String> constraintAttrs = new HashMap<>();
+        Map<String, String> auxAttrs = new HashMap<>();
+        String idName = null;
+        int count = parser.getAttributeCount();
+        for (int i = 0; i < count; i++) {
+            String name = parser.getAttributeName(i);
+            String value = parser.getAttributeValue(i);
+            if (value == null) {
+                continue;
+            }
+            String ns = parser.getAttributeNamespace(i);
+            boolean isApp = "http://schemas.android.com/apk/res-auto".equals(ns);
+            if (isApp && (name.startsWith("layout_constraint")
+                    || "barrierDirection".equals(name)
+                    || "constraint_referenced_ids".equals(name))) {
+                constraintAttrs.put(name, value);
+            } else if (isApp && "orientation".equals(name)) {
+                auxAttrs.put(name, value);
+            } else if ((ns == null || ns.isEmpty())
+                    && ("layout_width".equals(name) || "layout_height".equals(name)
+                    || "orientation".equals(name))) {
+                // Sans namespace (kxml2 peut retirer les préfixes) :
+                // dimensions déclarées + orientation
+                auxAttrs.put(name, value);
+            } else if ("http://schemas.android.com/apk/res/android".equals(ns)) {
+                if ("id".equals(name)) {
+                    idName = stripIdPrefix(value);
+                } else if ("layout_width".equals(name) || "layout_height".equals(name)
+                        || "orientation".equals(name)) {
+                    auxAttrs.put(name, value);
+                }
+            }
+        }
+        // N'enregistrer que les vues portant au moins un vrai attribut de
+        // contrainte — layout_width/height seuls (racine, vues quelconques)
+        // ne suffisent pas.
+        if (constraintAttrs.isEmpty()) {
+            return;
+        }
+        // id via la lecture ns-app générale (fallback)
+        if (idName == null) {
+            String id = getAttributeValue(parser, "android", "id");
+            if (id != null) {
+                idName = stripIdPrefix(id);
+            }
+        }
+        Map<String, String> attrs = new HashMap<>(constraintAttrs);
+        attrs.putAll(auxAttrs);
+        constraintAttributes.put(view, attrs);
+        if (idName != null) {
+            constraintViewIds.put(view, idName);
+        }
+    }
+
+    /**
+     * Retire le préfixe d'une référence d'id ({@code @+id/foo} / {@code @id/foo}).
+     */
+    private static String stripIdPrefix(String id) {
+        if (id == null) {
+            return null;
+        }
+        if (id.startsWith("@+id/") || id.startsWith("@id/")) {
+            return id.substring(id.indexOf('/') + 1);
+        }
+        return id;
+    }
+
+    /**
+     * @return une copie de la map des attributs de contrainte capturés
+     *         (vue → attribut → valeur)
+     */
+    public Map<View, Map<String, String>> getConstraintAttributes() {
+        return new HashMap<>(constraintAttributes);
+    }
+
+    /**
+     * @return {@code true} si l'inflation a capturé des attributs de
+     *         contrainte ConstraintLayout
+     */
+    public boolean hasConstraintAttributes() {
+        return !constraintAttributes.isEmpty();
     }
 }
