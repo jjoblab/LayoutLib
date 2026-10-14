@@ -92,6 +92,14 @@ public class RenderService {
     /** Résolveur de thèmes courant (gardé pour reconstruire l'applier). */
     private ThemeResolver themeResolver;
 
+    /**
+     * Registre d'attributs courant (ADR 0116 — P3/L8) : applique les
+     * attributs {@code app:*} sur les vues. Un registre par défaut est
+     * installé dès la construction ; remplaçable par
+     * {@link #setAttributeRegistry(jo.layoutlib.attributes.AttributeRegistry)}.
+     */
+    private jo.layoutlib.attributes.AttributeRegistry attributeRegistry;
+
     /** Indique si au moins un rendu réussi a été fait (pour garder le dernier valide). */
     private boolean hasValidRender = false;
 
@@ -150,6 +158,38 @@ public class RenderService {
         this.dimensionConverter =
                 new DimensionConverter(density, fontScale, xdpi);
         rebuildAttributeApplier();
+
+        // ADR 0116 — P3/L8 : registre d'attributs par défaut — les app:*
+        // (Material, AndroidX, vues custom par réflexion) sont appliqués
+        // sur chaque vue pendant l'inflation, sans configuration hôte.
+        this.attributeRegistry =
+                new jo.layoutlib.attributes.AttributeRegistryImpl(dimensionConverter);
+        inflater.setAttributeRegistry(attributeRegistry);
+    }
+
+    /**
+     * Remplace le registre d'attributs custom du pipeline.
+     *
+     * <p>Utile pour brancher un registre enrichi d'un fichier
+     * {@code attrs.xml} métier ({@code registerAttrsFile(...)}) ou un stub
+     * de test. Passer {@code null} désactive l'application des attributs
+     * {@code app:*}.</p>
+     *
+     * @param registry le nouveau registre (ou {@code null} pour désactiver)
+     */
+    public void setAttributeRegistry(
+            jo.layoutlib.attributes.AttributeRegistry registry) {
+        ensureNotReleased();
+        this.attributeRegistry = registry;
+        inflater.setAttributeRegistry(registry);
+    }
+
+    /**
+     * @return le registre d'attributs courant (celui par défaut si aucun
+     *         remplacement, {@code null} si désactivé)
+     */
+    public jo.layoutlib.attributes.AttributeRegistry getAttributeRegistry() {
+        return attributeRegistry;
     }
 
     /**
