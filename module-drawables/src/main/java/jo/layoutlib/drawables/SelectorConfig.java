@@ -51,6 +51,7 @@ public class SelectorConfig {
 
     public static class SelectorItem {
         private String drawableRef;
+        private String inlineDrawableXml;
         private Boolean statePressed;
         private Boolean stateEnabled;
         private Boolean stateFocused;
@@ -82,6 +83,30 @@ public class SelectorConfig {
 
         public String getDrawableRef() { return drawableRef; }
         public void setDrawableRef(String ref) { this.drawableRef = ref; }
+
+        /**
+         * @return le XML inline de l'enfant du {@code <item>} (shape,
+         *         vector, color, selector imbriqué…), ou {@code null} si
+         *         l'item désigne son drawable uniquement par référence
+         * @since 3.1
+         */
+        public String getInlineDrawableXml() { return inlineDrawableXml; }
+
+        /**
+         * Définit le XML inline capturé de l'enfant du {@code <item>}.
+         *
+         * @param xml le fragment XML autonome, ou {@code null}
+         * @since 3.1
+         */
+        public void setInlineDrawableXml(String xml) { this.inlineDrawableXml = xml; }
+
+        /**
+         * Indique si l'item embarque un drawable inline (ADR 0116 — L4).
+         *
+         * @return {@code true} si un enfant XML a été capturé
+         * @since 3.1
+         */
+        public boolean hasInlineDrawable() { return inlineDrawableXml != null; }
         public Boolean getStatePressed() { return statePressed; }
         public void setStatePressed(Boolean state) { this.statePressed = state; }
         public Boolean getStateEnabled() { return stateEnabled; }

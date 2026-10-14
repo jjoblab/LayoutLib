@@ -415,7 +415,11 @@ public class DrawableResolverImpl implements DrawableResolver {
      * donnent un {@link ColorDrawable}, les références {@code @drawable/}
      * sont résolues récursivement (shapes, selectors imbriqués…), et les
      * couleurs littérales ({@code #RRGGBB}) donnent également un
-     * {@link ColorDrawable}. Un item non résolvable est ignoré — jamais
+     * {@link ColorDrawable}. Depuis l'ADR 0116 — L4, un item sans référence
+     * peut embarquer son drawable en XML inline ({@code <shape>},
+     * {@code <vector>}, {@code <color>}…) : le fragment capturé est délégué
+     * au dispatch {@link #parse(String, Context)} — la référence garde la
+     * priorité (contrat P0). Un item non résolvable est ignoré — jamais
      * d'exception qui casserait le rendu entier.</p>
      */
     private Drawable createSelectorDrawable(String xml, Context context) {
@@ -427,6 +431,13 @@ public class DrawableResolverImpl implements DrawableResolver {
         int added = 0;
         for (SelectorConfig.SelectorItem item : config.getItems()) {
             Drawable child = resolveChildDrawable(item.getDrawableRef(), context);
+            if (child == null && item.hasInlineDrawable()) {
+                try {
+                    child = parse(item.getInlineDrawableXml(), context);
+                } catch (RuntimeException e) {
+                    // Un item inline cassé ne doit pas casser tout le selector
+                }
+            }
             if (child == null) {
                 continue;
             }
