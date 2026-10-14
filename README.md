@@ -4,7 +4,7 @@
 >
 > **Auteur :** `jo@Dev` (toutes les Javadoc)
 > **Langue des Javadoc :** Français
-> **Version :** 3.0.0 — ADR 0116 livré : drawables composites (layer-list/ripple/inset/bitmap), qualifiers de langue (values-fr/values-en), solver Cassowary câblé à ConstraintLayout ; toolchain alignée sur CodeIDE (Gradle 9.7.1, AGP 9.4.1, JDK 21, compileSdk 37.2)
+> **Version :** 3.1.0 — ADR 0116 complet : P0-P6 livrés (drawables composites, langue, Cassowary, app:*, adaptive-icons, animated-vector, Factory2/LayoutTransition) + L7 ?attr/→drawables, L4 items inline des selectors, L1 qualifiers sw/w/h…dp ; toolchain alignée sur CodeIDE (Gradle 9.7.1, AGP 9.4.1, JDK 21, compileSdk 37.2)
 > **Cible :** Android minSdk 24, compileSdk 37.2, Java 17
 > **Référence AOSP :** https://android.googlesource.com/platform/frameworks/layoutlib
 
@@ -43,10 +43,10 @@ Package principal : `jo.layoutlib` (un sous-package par module : `jo.layoutlib.i
 
 | Module | Statut | Classes | Integration dans le pipeline |
 |--------|--------|---------|------------------------------|
-| Module 1 — Inflater | ✅ Intégré | 86 classes | Cœur du pipeline (`RenderService`, `BridgeInflater`, `AttributeApplier` par famille de widgets) ; **hook `LayoutInflater.Factory2`** + `animateLayoutChanges` consommé + accès sûr `ViewTreeObserver` (ADR 0116 P6/L10-L11) |
-| Module 2 — Resources | ✅ Intégré | 96 classes | `ResourceResolver` consulté pour `@color/`, `@string/`, `@dimen/`, `@array/` |
-| Module 3 — Drawables | ✅ Intégré | 36 classes | `DrawableResolver` consulté pour `@drawable/` (shapes, selectors, vectors, layer-lists, ripples, insets, bitmaps, **adaptive icons** — P4/L6, **animated-vectors en première frame** — P5/L5) |
-| Module 4 — Themes | ✅ Intégré | 34 classes | `ThemeResolver` consulté pour `?attr/` (repli sur le thème natif) |
+| Module 1 — Inflater | ✅ Intégré | 86 classes | Cœur du pipeline (`RenderService`, `BridgeInflater`, `AttributeApplier` par famille de widgets) ; **hook `LayoutInflater.Factory2`** + `animateLayoutChanges` consommé + accès sûr `ViewTreeObserver` (ADR 0116 P6/L10-L11) ; **`?attr/` suivis jusqu'aux drawables** — background/src/foreground (L7) |
+| Module 2 — Resources | ✅ Intégré | 96 classes | `ResourceResolver` consulté pour `@color/`, `@string/`, `@dimen/`, `@array/` ; **qualifiers de dimensions d'écran `sw/w/h…dp`** avec `setSmallestScreenWidth()` (L1) |
+| Module 3 — Drawables | ✅ Intégré | 36 classes | `DrawableResolver` consulté pour `@drawable/` (shapes, selectors, vectors, layer-lists, ripples, insets, bitmaps, **adaptive icons** — P4/L6, **animated-vectors en première frame** — P5/L5) ; **items inline des `<selector>`** (L4) |
+| Module 4 — Themes | ✅ Intégré | 34 classes | `ThemeResolver` consulté pour `?attr/` (repli sur le thème natif) ; alimente la résolution `?attr/` **jusqu'aux drawables** côté inflater (L7) |
 | Module 5 — Attributes | ✅ Intégré | 42 classes | `AttributeRegistry` pilote le mode strict du `BridgeInflater` **et applique les attributs `app:*`** (attributs Material/AndroidX connus via setters natifs, vues custom via réflexion — ADR 0116 P3/L8) |
 | Module 6 — Layout | ✅ Intégré | 44 classes | `LayoutEngineImpl` fait la mesure + le layout ; `ConstraintSolver` (Cassowary) résout les contraintes ConstraintLayout |
 | Validation | ✅ Livré | 7 classes | Hors pipeline : catalogue de 50 layouts de comparaison |
@@ -55,7 +55,7 @@ Package principal : `jo.layoutlib` (un sous-package par module : `jo.layoutlib.i
 
 **Référence AOSP consultée :** https://android.googlesource.com/platform/frameworks/layoutlib (327 fichiers, 43 597 lignes) + tools/base/layoutlib-api (77 fichiers, 9 108 lignes)
 
-**Tests : 722 unitaires JVM** (696 via `./gradlew testAllModules` + 26 pour l'app via `:layout-editor-app:testDebugUnitTest`) **+ tests instrumentés** (`connectedAndroidTest`, catalogue de 50 layouts, cf. `validation/`). CI GitHub Actions : `.github/workflows/ci.yml`.
+**Tests : 789 unitaires JVM** (763 via `./gradlew testAllModules` + 26 pour l'app via `:layout-editor-app:testDebugUnitTest`) **+ tests instrumentés** (`connectedAndroidTest`, catalogue de 50 layouts, cf. `validation/`). CI GitHub Actions : `.github/workflows/ci.yml`.
 
 ## Démarrage rapide
 
