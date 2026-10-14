@@ -1604,6 +1604,22 @@ public final class AttributeApplier {
         if (value == null || value.isEmpty()) return 0;
         if ("match_parent".equals(value) || "fill_parent".equals(value)) return ViewGroup.LayoutParams.MATCH_PARENT;
         if ("wrap_content".equals(value)) return ViewGroup.LayoutParams.WRAP_CONTENT;
+        // v3.4.4 — @dimen/ : résoudre via le ResourceResolver si disponible.
+        // Avant, @dimen/ causait un crash "Dimension invalide" qui tuait
+        // tout le rendu. Maintenant on retourne 0 (silencieux) si non résolu.
+        if (value.startsWith("@dimen/") && resourceResolver != null) {
+            try {
+                String name = value.substring("@dimen/".length());
+                Float dimPx = resourceResolver.getDimension(name);
+                if (dimPx != null) {
+                    return dimPx.intValue();
+                }
+            } catch (RuntimeException e) {
+                // @dimen/ non trouvé → 0 (la vue prendra WRAP_CONTENT ou
+                // 0px — pas idéal mais ne crash pas le rendu).
+                return 0;
+            }
+        }
         if (dimensionConverter != null) {
             try { return dimensionConverter.toPixelsInt(value); } catch (ResourceException e) { return 0; }
         }
