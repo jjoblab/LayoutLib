@@ -5,6 +5,7 @@ import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.graphics.Shader;
+import android.graphics.drawable.AdaptiveIconDrawable;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
@@ -13,6 +14,7 @@ import android.graphics.drawable.InsetDrawable;
 import android.graphics.drawable.LayerDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.graphics.drawable.StateListDrawable;
+import android.os.Build;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -96,6 +98,9 @@ public class DrawableResolverImpl implements DrawableResolver {
     /** Parser de bitmaps. */
     private final BitmapParser bitmapParser;
 
+    /** Parser d'icônes adaptatives (ADR 0116 — P4/L6). */
+    private final AdaptiveIconParser adaptiveIconParser;
+
     /**
      * Construit un resolver avec un résolveur de resources et convertisseur.
      *
@@ -113,6 +118,7 @@ public class DrawableResolverImpl implements DrawableResolver {
         this.rippleParser = new RippleParser();
         this.insetParser = new InsetParser(dimensionConverter);
         this.bitmapParser = new BitmapParser();
+        this.adaptiveIconParser = new AdaptiveIconParser();
     }
 
     /**
@@ -217,6 +223,8 @@ public class DrawableResolverImpl implements DrawableResolver {
                 return createInsetDrawable(xml, context);
             case "bitmap":
                 return createBitmapDrawable(xml, context);
+            case "adaptive-icon":
+                return createAdaptiveIconDrawable(xml, context);
             default:
                 return null;
         }
@@ -264,6 +272,9 @@ public class DrawableResolverImpl implements DrawableResolver {
                 break;
             case "bitmap":
                 config = bitmapParser.parse(xml);
+                break;
+            case "adaptive-icon":
+                config = adaptiveIconParser.parse(xml);
                 break;
             default:
                 config = null;
@@ -598,6 +609,87 @@ public class DrawableResolverImpl implements DrawableResolver {
         } catch (RuntimeException e) {
             // Drawables null dans le tableau (JVM) — repli silencieux
             return null;
+        }
+    }
+
+    /**
+     * Crée le rendu statique d'une icône adaptative (ADR 0116 — P4/L6).
+     *
+     * <p>Les couches {@code <background>} et {@code <foreground>} sont
+     * résolues comme les calques d'un layer-list (référence prioritaire,
+     * puis XML inline). Selon le niveau d'API au moment de l'exécution :</p>
+     * <ul>
+     *   <li><strong>API 33+</strong> : {@link AdaptiveIconDrawable} à trois
+     *       couches (monochrome incluse) ;</li>
+     *   <li><strong>API 26-32</strong> : {@link AdaptiveIconDrawable} à deux
+     *       couches ;</li>
+     *   <li><strong>API 24-25 et JVM de test</strong> : repli
+     *       {@link LayerDrawable} superposant background puis foreground —
+     *       la couche monochrome (icônes thémées du lanceur) n'a pas de sens
+     *       en preview statique et n'est ajoutée que si elle est la seule
+     *       couche présente.</li>
+     * </ul>
+     *
+     * <p>Philosophie placeholder : une couche non résolvable est ignorée ;
+     * si aucune couche ne résout, retourne {@code null} (l'appelant affiche
+     * son placeholder neutre).</p>
+     *
+     * @param xml     le XML source
+     * @param context le contexte Android (peut être {@code null} en JVM)
+     * @return l'icône adaptative, ou {@code null}
+     */
+    private Drawable createAdaptiveIconDrawable(String xml, Context context) {
+        AdaptiveIconConfig config;
+        try {
+            config = adaptiveIconParser.parse(xml);
+        } catch (DrawableException e) {
+            return null;
+        }
+        if (!config.hasAnyLayer()) {
+            return null;
+        }
+        Drawable background = resolveLayerChild(
+                config.getBackgroundRef(), config.getBackgroundXml(), context);
+        Drawable foreground = resolveLayerChild(
+                config.getForegroundRef(), config.getForegroundXml(), context);
+        Drawable monochrome = resolveLayerChild(
+                config.getMonochromeRef(), config.getMonochromeXml(), context);
+
+        try {
+            if (background != null && foreground != null) {
+                if (Build.VERSION.SDK_INT >= 33 && monochrome != null) {
+                    return new AdaptiveIconDrawable(background, foreground, monochrome);
+                }
+                if (Build.VERSION.SDK_INT >= 26) {
+                    return new AdaptiveIconDrawable(background, foreground);
+                }
+                // Repli statique (API 24-25, JVM) : superposition simple
+                return new LayerDrawable(
+                        new Drawable[]{background, foreground});
+            }
+            // Une seule couche résolue : l'afficher telle quelle
+            List<Drawable> layers = new ArrayList<>();
+            if (background != null) {
+                layers.add(background);
+            }
+            if (foreground != null) {
+                layers.add(foreground);
+            }
+            if (layers.isEmpty() && monochrome != null) {
+                layers.add(monochrome);
+            }
+            if (layers.isEmpty()) {
+                return null;
+            }
+            return new LayerDrawable(layers.toArray(new Drawable[0]));
+        } catch (RuntimeException e) {
+            // Constructeur AdaptiveIconDrawable indisponible (JVM mockable
+            // selon la cible) — repli LayerDrawable
+            List<Drawable> layers = new ArrayList<>();
+            if (background != null) layers.add(background);
+            if (foreground != null) layers.add(foreground);
+            if (layers.isEmpty()) return null;
+            return new LayerDrawable(layers.toArray(new Drawable[0]));
         }
     }
 
