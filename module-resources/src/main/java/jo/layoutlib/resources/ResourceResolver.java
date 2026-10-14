@@ -13,6 +13,8 @@ package jo.layoutlib.resources;
  *   <li>{@code @integer/foo} → valeur entière</li>
  *   <li>{@code @bool/foo} → booléen</li>
  *   <li>{@code @array/foo} → liste de chaînes ({@code <string-array>})</li>
+ *   <li>{@code @plurals/foo} → chaîne de pluriel sélectionnée par les règles
+ *       CLDR de la locale courante ({@code <plurals>})</li>
  *   <li>{@code @layout/foo} → contenu XML du layout</li>
  *   <li>{@code @drawable/foo} → chemin vers le fichier drawable (XML ou image)</li>
  * </ul>
@@ -84,6 +86,48 @@ public interface ResourceResolver {
      *         introuvable
      */
     java.util.List<String> getStringArray(String reference);
+
+    /**
+     * Résout une référence de pluriel {@code @plurals/foo} pour une quantité
+     * donnée (v3.2).
+     *
+     * <p>Sélectionne l'item du {@code <plurals>} dont la catégorie CLDR
+     * ({@code one}, {@code other}, {@code few}…) correspond à la quantité et
+     * à la langue courante (voir {@link #setLanguage(String)}) — sémantique
+     * d'{@code android.content.res.Resources#getQuantityString(int, int,
+     * Object...)}. Si la catégorie exacte manque dans le plurals, repli sur
+     * {@code other} ; si {@code other} manque aussi, retourne {@code null}
+     * (jamais d'exception).</p>
+     *
+     * <p>Quand des arguments de formatage sont fournis, le texte sélectionné
+     * est formaté par {@code String.format} (les items peuvent référencer
+     * d'autres chaînes via {@code @string/}, résolues récursivement). Un
+     * pattern invalide retourne le texte brut non formaté.</p>
+     *
+     * @param reference   la référence (ex. {@code @plurals/item_count} — le
+     *                    nom nu est aussi accepté)
+     * @param quantity    la quantité pilotant la catégorie CLDR
+     * @param formatArgs  arguments de formatage du pattern (aucun = texte
+     *                    brut avec le pattern intact, comme Android)
+     * @return la chaîne formatée, ou {@code null} si le plurals est
+     *         introuvable ou sans item applicable
+     * @since 3.2
+     */
+    String getQuantityString(String reference, int quantity, Object... formatArgs);
+
+    /**
+     * Récupère les items d'un pluriel {@code @plurals/foo} (v3.2).
+     *
+     * <p>Utile pour l'introspection (éditeur de resources, preview qui
+     * choisit lui-même la catégorie). La map renvoyée est une copie défensive
+     * catégorie → texte, dans l'ordre de déclaration du XML.</p>
+     *
+     * @param reference la référence (ex. {@code @plurals/item_count} — le
+     *                  nom nu est aussi accepté)
+     * @return une copie de la map des items, ou {@code null} si introuvable
+     * @since 3.2
+     */
+    java.util.Map<String, String> getPlurals(String reference);
 
     /**
      * Récupère le contenu XML d'un layout référencé par {@code @layout/foo}.
