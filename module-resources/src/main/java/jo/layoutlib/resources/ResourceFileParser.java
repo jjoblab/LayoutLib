@@ -159,8 +159,11 @@ public class ResourceFileParser {
                 table.putStringArray(name, parseStringArrayItems(parser), qualifier);
                 return 1;
             case "plurals":
+                table.putPlurals(name, parsePluralItems(parser), qualifier);
+                return 1;
             case "item":
-                // Élément générique (parfois utilisé pour les typed values)
+                // Élément générique orphelin (hors <string-array>/<plurals>)
+                // — parfois utilisé pour les typed values
                 return 0;
             case "eat-comment":
             case "eat":
@@ -230,6 +233,48 @@ public class ResourceFileParser {
                     items.add(current.toString().trim());
                     inItem = false;
                 }
+            } else if (event == XmlPullParser.END_DOCUMENT) {
+                break;
+            }
+        }
+        return items;
+    }
+
+    /**
+     * Extrait les éléments {@code <item quantity="…">} d'un {@code <plurals>}.
+     *
+     * <p>Le parser est positionné sur le START_TAG du plurals ; en sortie, il
+     * est positionné juste après son END_TAG. Les items sans attribut
+     * {@code quantity} (ou vide) sont ignorés — philosophie placeholder,
+     * jamais d'exception. Les catégories inconnues de CLDR (ex.
+     * {@code "lots"}) sont stockées telles quelles : elles ne seront jamais
+     * sélectionnées par {@link PluralRules} mais restent visibles par
+     * introspection. L'ordre de déclaration est préservé.</p>
+     *
+     * @param parser le parser positionné sur le START_TAG du plurals
+     * @return la map catégorie → texte (peut être vide)
+     * @since 3.2
+     */
+    private java.util.Map<String, String> parsePluralItems(XmlPullParser parser)
+            throws XmlPullParserException, IOException {
+        java.util.Map<String, String> items = new java.util.LinkedHashMap<>();
+        int depth = 1;
+        while (depth > 0) {
+            int event = parser.next();
+            if (event == XmlPullParser.START_TAG) {
+                depth++;
+                if (depth == 2 && "item".equals(parser.getName())) {
+                    String quantity = parser.getAttributeValue(null, "quantity");
+                    String text = parseText(parser);
+                    // parseText a consommé l'END_TAG de l'item : on
+                    // re-synchronise la profondeur manuellement.
+                    depth--;
+                    if (quantity != null && !quantity.isEmpty()) {
+                        items.put(quantity, text);
+                    }
+                }
+            } else if (event == XmlPullParser.END_TAG) {
+                depth--;
             } else if (event == XmlPullParser.END_DOCUMENT) {
                 break;
             }

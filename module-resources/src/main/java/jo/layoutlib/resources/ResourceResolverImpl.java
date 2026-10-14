@@ -7,7 +7,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -95,6 +98,9 @@ public class ResourceResolverImpl implements ResourceResolver {
 
     /** Cache des résolutions de string-arrays (liste défensive, copiée au retour). */
     private final ResourceCache<String, List<String>> stringArrayCache = new ResourceCache<>();
+
+    /** Cache des résolutions de pluriels (map défensive, copiée au retour). */
+    private final ResourceCache<String, Map<String, String>> pluralsCache = new ResourceCache<>();
 
     /**
      * Construit un resolver lié à un dossier {@code res/}.
@@ -368,6 +374,142 @@ public class ResourceResolverImpl implements ResourceResolver {
             }
         }
         return resolved;
+    }
+
+    /**
+     * Résout une référence de pluriel {@code @plurals/foo} — see
+     * {@link ResourceResolver#getQuantityString(String, int, Object...)}.
+     *
+     * <p>Sélection CLDR par {@link PluralRules#select(String, int)} sur la
+     * langue du qualifier courant, repli {@code other} puis {@code null},
+     * résolution des items {@code @string/} chainables, formatage tolérant
+     * (pattern invalide → texte brut). Jamais d'exception.</p>
+     *
+     * @since 3.2
+     */
+    @Override
+    public String getQuantityString(String reference, int quantity, Object... formatArgs) {
+        if (reference == null || reference.isEmpty()) {
+            return null;
+        }
+        Map<String, String> plurals = getPlurals(reference);
+        if (plurals == null || plurals.isEmpty()) {
+            return null;
+        }
+        String category = PluralRules.select(currentQualifier.getLanguage(), quantity);
+        String text = plurals.get(category);
+        if (text == null) {
+            // Repli sémantique : la catégorie exacte manque (traduction
+            // partielle), « other » est la catégorie obligatoire de CLDR.
+            text = plurals.get(PluralRules.CATEGORY_OTHER);
+        }
+        if (text == null) {
+            return null;
+        }
+        if (text.startsWith("@plurals/")) {
+            // Chaîne de pluriels rare mais légale — résolution récursive
+            // bornée par MAX_CHAIN_DEPTH.
+            return resolvePluralsChain(text, quantity, formatArgs, 1);
+        }
+        if (text.startsWith("@string/")) {
+            text = resolveStringChain(text, 0);
+            if (text == null) {
+                return null;
+            }
+        }
+        return formatQuantityText(text, formatArgs);
+    }
+
+    /**
+     * Résolution chainable d'un pluriel qui référence un autre pluriel.
+     *
+     * @param reference   la référence {@code @plurals/} cible
+     * @param quantity    la quantité (propagée à la cible)
+     * @param formatArgs  arguments de formatage
+     * @param depth       profondeur actuelle (anti-boucle)
+     */
+    private String resolvePluralsChain(String reference, int quantity,
+                                       Object[] formatArgs, int depth) {
+        if (depth > MAX_CHAIN_DEPTH) {
+            return null;
+        }
+        Map<String, String> plurals = getPlurals(reference);
+        if (plurals == null || plurals.isEmpty()) {
+            return null;
+        }
+        String category = PluralRules.select(currentQualifier.getLanguage(), quantity);
+        String text = plurals.get(category);
+        if (text == null) {
+            text = plurals.get(PluralRules.CATEGORY_OTHER);
+        }
+        if (text == null) {
+            return null;
+        }
+        if (text.startsWith("@plurals/")) {
+            return resolvePluralsChain(text, quantity, formatArgs, depth + 1);
+        }
+        if (text.startsWith("@string/")) {
+            text = resolveStringChain(text, 0);
+            if (text == null) {
+                return null;
+            }
+        }
+        return formatQuantityText(text, formatArgs);
+    }
+
+    /**
+     * Formatte le texte d'un item de pluriel.
+     *
+     * <p>Sans arguments, le pattern est laissé intact (comme Android :
+     * {@code getQuantityString(id, quantity)} ne substitue rien). Avec des
+     * arguments, {@code String.format} est tenté dans la locale courante du
+     * qualifier — un pattern invalide dégrade silencieusement en texte brut
+     * (philosophie placeholder, jamais d'exception).</p>
+     *
+     * @param text       le texte de l'item sélectionné
+     * @param formatArgs les arguments explicites (peut être vide)
+     * @return la chaîne formatée, ou le texte brut en cas d'échec
+     */
+    private String formatQuantityText(String text, Object[] formatArgs) {
+        if (formatArgs == null || formatArgs.length == 0) {
+            return text;
+        }
+        try {
+            Locale locale = currentQualifier.getLanguage() != null
+                    ? Locale.of(currentQualifier.getLanguage())
+                    : Locale.ROOT;
+            return String.format(locale, text, formatArgs);
+        } catch (RuntimeException e) {
+            // Pattern incompatible avec les arguments (% inattendu,
+            // conversion inconnue…) : texte brut, jamais d'exception.
+            return text;
+        }
+    }
+
+    /**
+     * Récupère les items d'un pluriel {@code @plurals/foo} — see
+     * {@link ResourceResolver#getPlurals(String)}.
+     *
+     * @since 3.2
+     */
+    @Override
+    public Map<String, String> getPlurals(String reference) {
+        if (reference == null || reference.isEmpty()) {
+            return null;
+        }
+        Map<String, String> cached = pluralsCache.get(reference);
+        if (cached != null) {
+            return new LinkedHashMap<>(cached);
+        }
+        String name = reference.startsWith("@plurals/")
+                ? reference.substring("@plurals/".length())
+                : reference;
+        Map<String, String> raw = table.getPlurals(name, currentQualifier);
+        if (raw == null) {
+            return null;
+        }
+        pluralsCache.put(reference, new LinkedHashMap<>(raw));
+        return new LinkedHashMap<>(raw);
     }
 
     @Override
@@ -668,5 +810,6 @@ public class ResourceResolverImpl implements ResourceResolver {
         integerCache.clear();
         boolCache.clear();
         stringArrayCache.clear();
+        pluralsCache.clear();
     }
 }

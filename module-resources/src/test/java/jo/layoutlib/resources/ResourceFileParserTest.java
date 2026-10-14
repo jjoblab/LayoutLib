@@ -84,8 +84,8 @@ class ResourceFileParserTest {
         }
 
         @Test
-        @DisplayName("ignore les string-array et plurals")
-        void shouldIgnoreStringArraysAndPlurals() {
+        @DisplayName("les plurals atterrissent dans leur propre table, pas parmi les chaînes")
+        void shouldStorePluralsInTheirOwnTable() {
             parser.parse("<resources>"
                     + "<string name=\"hello\">Hello</string>"
                     + "<string-array name=\"items\"><item>A</item><item>B</item></string-array>"
@@ -93,6 +93,84 @@ class ResourceFileParserTest {
                     + "</resources>");
             assertThat(table.stringCount()).isEqualTo(1);
             assertThat(table.getString("hello", ResourceQualifier.DEFAULT)).isEqualTo("Hello");
+            assertThat(table.pluralsCount()).isEqualTo(1);
+            assertThat(table.getPlurals("count", ResourceQualifier.DEFAULT))
+                    .containsEntry("one", "un");
+        }
+    }
+
+    @Nested
+    @DisplayName("Parsing de <plurals>")
+    class PluralsParsing {
+
+        @Test
+        @DisplayName("parse les items par catégorie CLDR")
+        void shouldParsePluralItemsByCategory() {
+            parser.parse("<resources><plurals name=\"songs\">"
+                    + "<item quantity=\"one\">%d chanson</item>"
+                    + "<item quantity=\"other\">%d chansons</item>"
+                    + "</plurals></resources>");
+            assertThat(table.getPlurals("songs", ResourceQualifier.DEFAULT))
+                    .containsEntry("one", "%d chanson")
+                    .containsEntry("other", "%d chansons")
+                    .hasSize(2);
+        }
+
+        @Test
+        @DisplayName("préserve l'ordre de déclaration des items")
+        void shouldPreserveItemOrder() {
+            parser.parse("<resources><plurals name=\"ordered\">"
+                    + "<item quantity=\"many\">A</item>"
+                    + "<item quantity=\"one\">B</item>"
+                    + "<item quantity=\"other\">C</item>"
+                    + "</plurals></resources>");
+            assertThat(table.getPlurals("ordered", ResourceQualifier.DEFAULT).keySet())
+                    .containsExactly("many", "one", "other");
+        }
+
+        @Test
+        @DisplayName("ignore les items sans attribut quantity")
+        void shouldIgnoreItemsWithoutQuantity() {
+            parser.parse("<resources><plurals name=\"partial\">"
+                    + "<item>orphan</item>"
+                    + "<item quantity=\"\">vide</item>"
+                    + "<item quantity=\"other\">garde</item>"
+                    + "</plurals></resources>");
+            assertThat(table.getPlurals("partial", ResourceQualifier.DEFAULT))
+                    .hasSize(1)
+                    .containsEntry("other", "garde");
+        }
+
+        @Test
+        @DisplayName("catégorie dupliquée : le dernier item gagne")
+        void shouldLetLastDuplicateWin() {
+            parser.parse("<resources><plurals name=\"dup\">"
+                    + "<item quantity=\"other\">premier</item>"
+                    + "<item quantity=\"other\">second</item>"
+                    + "</plurals></resources>");
+            assertThat(table.getPlurals("dup", ResourceQualifier.DEFAULT))
+                    .containsEntry("other", "second")
+                    .hasSize(1);
+        }
+
+        @Test
+        @DisplayName("aplatit les balises inline du texte (comme <string>)")
+        void shouldFlattenInlineTags() {
+            parser.parse("<resources><plurals name=\"rich\">"
+                    + "<item quantity=\"other\">%d <b>éléments</b> clés</item>"
+                    + "</plurals></resources>");
+            assertThat(table.getPlurals("rich", ResourceQualifier.DEFAULT))
+                    .containsEntry("other", "%d éléments clés");
+        }
+
+        @Test
+        @DisplayName("stocke les catégories inconnues de CLDR sans échouer")
+        void shouldStoreUnknownCategories() {
+            parser.parse("<resources><plurals name=\"weird\">"
+                    + "<item quantity=\"lots\">beaucoup</item>"
+                    + "</plurals></resources>");
+            assertThat(table.getPlurals("weird", ResourceQualifier.DEFAULT))
+                    .containsEntry("lots", "beaucoup");
         }
     }
 

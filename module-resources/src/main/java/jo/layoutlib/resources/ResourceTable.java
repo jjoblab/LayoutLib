@@ -1,6 +1,7 @@
 package jo.layoutlib.resources;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -52,6 +53,31 @@ public class ResourceTable {
     /** Table des string-arrays, indexée par nom puis qualifier. */
     private final Map<String, Map<ResourceQualifier, List<String>>> stringArrayTable =
             new HashMap<>();
+
+    /** Table des pluriels, indexée par nom puis qualifier. */
+    private final Map<String, Map<ResourceQualifier, Map<String, String>>> pluralsTable =
+            new HashMap<>();
+
+    /**
+     * Ajoute un pluriel ({@code <plurals>}) dans la table.
+     *
+     * <p>La map associe chaque catégorie CLDR déclarée ({@code one},
+     * {@code other}, {@code few}…) au texte de son item. L'ordre d'insertion
+     * est préservé (LinkedHashMap) pour l'introspection.</p>
+     *
+     * @param name           nom du pluriel (référencé par {@code @plurals/name})
+     * @param quantityToText les items catégorie → texte (peut être {@code null},
+     *                       stocké comme un pluriel vide)
+     * @param qualifier      qualifier du dossier source
+     * @since 3.2
+     */
+    public void putPlurals(String name, Map<String, String> quantityToText,
+                           ResourceQualifier qualifier) {
+        Map<String, String> items = quantityToText != null
+                ? new LinkedHashMap<>(quantityToText)
+                : new LinkedHashMap<>();
+        pluralsTable.computeIfAbsent(name, k -> new HashMap<>()).put(qualifier, items);
+    }
 
     /**
      * Ajoute une couleur dans la table.
@@ -189,6 +215,20 @@ public class ResourceTable {
     }
 
     /**
+     * Récupère les items d'un pluriel pour le qualifier cible.
+     *
+     * @param name   nom du pluriel
+     * @param target qualifier cible
+     * @return une copie de la map catégorie → texte (ordre de déclaration
+     *         préservé), ou {@code null} si absente
+     * @since 3.2
+     */
+    public Map<String, String> getPlurals(String name, ResourceQualifier target) {
+        Map<String, String> items = resolveBest(pluralsTable.get(name), target);
+        return items != null ? new LinkedHashMap<>(items) : null;
+    }
+
+    /**
      * Indique si un string-array existe dans la table.
      *
      * @param name nom de l'array
@@ -196,6 +236,25 @@ public class ResourceTable {
      */
     public boolean hasStringArray(String name) {
         return stringArrayTable.containsKey(name);
+    }
+
+    /**
+     * Indique si un pluriel existe dans la table (n'importe quel qualifier).
+     *
+     * @param name nom du pluriel
+     * @return {@code true} si le pluriel existe
+     * @since 3.2
+     */
+    public boolean hasPlurals(String name) {
+        return pluralsTable.containsKey(name);
+    }
+
+    /**
+     * @return le nombre total de pluriels stockés
+     * @since 3.2
+     */
+    public int pluralsCount() {
+        return pluralsTable.size();
     }
 
     /**
@@ -309,5 +368,6 @@ public class ResourceTable {
         integerTable.clear();
         boolTable.clear();
         stringArrayTable.clear();
+        pluralsTable.clear();
     }
 }
