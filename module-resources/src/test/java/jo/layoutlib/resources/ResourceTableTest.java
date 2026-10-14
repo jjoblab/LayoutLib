@@ -135,4 +135,138 @@ class ResourceTableTest {
             assertThat(table.stringCount()).isEqualTo(0);
         }
     }
+
+    @Nested
+    @DisplayName("Integer-arrays et segments xliff (v3.3)")
+    class IntegerArrayAndXliff {
+
+        @Test
+        @DisplayName("stocke et récupère un integer-array")
+        void shouldStoreAndRetrieveIntegerArray() {
+            table.putIntegerArray("ratios", java.util.Arrays.asList(2, 3, 5),
+                    ResourceQualifier.DEFAULT);
+            assertThat(table.getIntegerArray("ratios", ResourceQualifier.DEFAULT))
+                    .containsExactly(2, 3, 5);
+        }
+
+        @Test
+        @DisplayName("integer-array : repli de qualifier (fr ciblé, défaut sinon)")
+        void shouldFallbackIntegerArrayByQualifier() {
+            table.putIntegerArray("ratios", java.util.Arrays.asList(2, 3),
+                    ResourceQualifier.DEFAULT);
+            table.putIntegerArray("ratios", java.util.Arrays.asList(4, 9),
+                    ResourceQualifier.forLanguage("fr"));
+            assertThat(table.getIntegerArray("ratios", ResourceQualifier.forLanguage("fr")))
+                    .containsExactly(4, 9);
+            assertThat(table.getIntegerArray("ratios", ResourceQualifier.DEFAULT))
+                    .containsExactly(2, 3);
+        }
+
+        @Test
+        @DisplayName("integer-array null stocké comme liste vide, copie défensive")
+        void shouldDefensivelyCopyIntegerArrays() {
+            java.util.List<Integer> values = new java.util.ArrayList<>();
+            values.add(1);
+            table.putIntegerArray("nums", values, ResourceQualifier.DEFAULT);
+            values.set(0, 999);
+            assertThat(table.getIntegerArray("nums", ResourceQualifier.DEFAULT))
+                    .containsExactly(1);
+            java.util.List<Integer> got = table.getIntegerArray("nums", ResourceQualifier.DEFAULT);
+            got.set(0, 777);
+            assertThat(table.getIntegerArray("nums", ResourceQualifier.DEFAULT))
+                    .containsExactly(1);
+            table.putIntegerArray("nul", null, ResourceQualifier.DEFAULT);
+            assertThat(table.getIntegerArray("nul", ResourceQualifier.DEFAULT)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("hasIntegerArray / integerArrayCount")
+        void shouldSupportIntegerArrayIntrospection() {
+            table.putIntegerArray("nums", java.util.Arrays.asList(1),
+                    ResourceQualifier.DEFAULT);
+            assertThat(table.hasIntegerArray("nums")).isTrue();
+            assertThat(table.hasIntegerArray("other")).isFalse();
+            assertThat(table.integerArrayCount()).isEqualTo(1);
+            assertThat(table.hasStringArray("nums")).isFalse();
+        }
+
+        @Test
+        @DisplayName("stocke et récupère les spans xliff d'une chaîne (repli qualifier)")
+        void shouldStoreAndRetrieveStringXliffSpans() {
+            table.putStringXliffSpans("songs",
+                    java.util.Collections.singletonList(
+                            new XliffSpan("artist", "Adele", "%2$s")),
+                    ResourceQualifier.DEFAULT);
+            table.putStringXliffSpans("songs",
+                    java.util.Collections.singletonList(
+                            new XliffSpan("artist", "Adèle", "%2$s")),
+                    ResourceQualifier.forLanguage("fr"));
+            assertThat(table.getStringXliffSpans("songs",
+                    ResourceQualifier.forLanguage("fr")).get(0).getExample())
+                    .isEqualTo("Adèle");
+            assertThat(table.getStringXliffSpans("songs",
+                    ResourceQualifier.DEFAULT).get(0).getExample())
+                    .isEqualTo("Adele");
+            assertThat(table.getStringXliffSpans("inconnu", ResourceQualifier.DEFAULT))
+                    .isNull();
+        }
+
+        @Test
+        @DisplayName("spans xliff : copie défensive des listes retournées")
+        void shouldDefensivelyCopyXliffSpans() {
+            java.util.List<XliffSpan> spans = new java.util.ArrayList<>();
+            spans.add(new XliffSpan("a", "1", "%d"));
+            table.putStringXliffSpans("s", spans, ResourceQualifier.DEFAULT);
+            spans.set(0, new XliffSpan("x", "x", "x"));
+            assertThat(table.getStringXliffSpans("s", ResourceQualifier.DEFAULT)
+                    .get(0).getId()).isEqualTo("a");
+            java.util.List<XliffSpan> got =
+                    table.getStringXliffSpans("s", ResourceQualifier.DEFAULT);
+            got.clear();
+            assertThat(table.getStringXliffSpans("s", ResourceQualifier.DEFAULT))
+                    .hasSize(1);
+        }
+
+        @Test
+        @DisplayName("stocke et récupère les spans xliff d'un pluriel (copie profonde)")
+        void shouldStoreAndRetrievePluralsXliffSpans() {
+            java.util.Map<String, java.util.List<XliffSpan>> byCategory =
+                    new java.util.LinkedHashMap<>();
+            byCategory.put("one", java.util.Collections.singletonList(
+                    new XliffSpan("count", "1", "%d")));
+            byCategory.put("other", java.util.Collections.singletonList(
+                    new XliffSpan("count", "7", "%d")));
+            table.putPluralsXliffSpans("items", byCategory, ResourceQualifier.DEFAULT);
+            java.util.Map<String, java.util.List<XliffSpan>> got =
+                    table.getPluralsXliffSpans("items", ResourceQualifier.DEFAULT);
+            assertThat(got).containsOnlyKeys("one", "other");
+            got.get("one").clear();
+            got.put("many", java.util.Collections.emptyList());
+            assertThat(table.getPluralsXliffSpans("items", ResourceQualifier.DEFAULT))
+                    .containsOnlyKeys("one", "other");
+            assertThat(table.hasPluralsXliffSpans("items")).isTrue();
+            assertThat(table.pluralsXliffCount()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("clear vide aussi les integer-arrays et les spans xliff")
+        void shouldClearNewTables() {
+            table.putIntegerArray("nums", java.util.Arrays.asList(1),
+                    ResourceQualifier.DEFAULT);
+            table.putStringXliffSpans("s", java.util.Collections.singletonList(
+                    new XliffSpan("a", "1", "%d")), ResourceQualifier.DEFAULT);
+            table.putPluralsXliffSpans("p",
+                    java.util.Collections.singletonMap("other",
+                            java.util.Collections.singletonList(
+                                    new XliffSpan("a", "1", "%d"))),
+                    ResourceQualifier.DEFAULT);
+            table.clear();
+            assertThat(table.integerArrayCount()).isEqualTo(0);
+            assertThat(table.stringXliffCount()).isEqualTo(0);
+            assertThat(table.pluralsXliffCount()).isEqualTo(0);
+            assertThat(table.hasIntegerArray("nums")).isFalse();
+            assertThat(table.hasStringXliffSpans("s")).isFalse();
+            assertThat(table.hasPluralsXliffSpans("p")).isFalse();
+        }
+    }
 }

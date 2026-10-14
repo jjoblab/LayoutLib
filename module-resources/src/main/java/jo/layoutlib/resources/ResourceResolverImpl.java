@@ -102,6 +102,9 @@ public class ResourceResolverImpl implements ResourceResolver {
     /** Cache des résolutions de pluriels (map défensive, copiée au retour). */
     private final ResourceCache<String, Map<String, String>> pluralsCache = new ResourceCache<>();
 
+    /** Cache des résolutions d'integer-arrays (liste défensive, copiée au retour). */
+    private final ResourceCache<String, List<Integer>> integerArrayCache = new ResourceCache<>();
+
     /**
      * Construit un resolver lié à un dossier {@code res/}.
      *
@@ -374,6 +377,149 @@ public class ResourceResolverImpl implements ResourceResolver {
             }
         }
         return resolved;
+    }
+
+    /**
+     * Résout une référence d'integer-array {@code @array/foo} — see
+     * {@link ResourceResolver#getIntegerArray(String)}.
+     *
+     * <p>Le nom nu est accepté en plus du préfixe {@code @array/} (même
+     * tolérance que {@link #getPlurals(String)}). Les items sont des
+     * littéraux parsés à la capture ; un item malformé a déjà été
+     * neutralisé en {@code 0} par le parser (longueur préservée).</p>
+     *
+     * @since 3.3
+     */
+    @Override
+    public List<Integer> getIntegerArray(String reference) {
+        if (reference == null || reference.isEmpty()) {
+            return null;
+        }
+        List<Integer> cached = integerArrayCache.get(reference);
+        if (cached != null) {
+            return new ArrayList<>(cached);
+        }
+        List<Integer> result = resolveIntegerArrayChain(reference, 0);
+        if (result != null) {
+            integerArrayCache.put(reference, new ArrayList<>(result));
+            return new ArrayList<>(result);
+        }
+        return null;
+    }
+
+    /**
+     * Résout un integer-array — les items sont déjà typés à la capture
+     * (littéraux parsés, malformés neutralisés en 0 par le parser).
+     */
+    private List<Integer> resolveIntegerArrayChain(String reference, int depth) {
+        if (depth > MAX_CHAIN_DEPTH) {
+            return null;
+        }
+        String name = reference.startsWith("@array/")
+                ? reference.substring("@array/".length())
+                : reference;
+        if (name.isEmpty() || name.startsWith("@")) {
+            return null;
+        }
+        List<Integer> raw = table.getIntegerArray(name, currentQualifier);
+        if (raw == null) {
+            return null;
+        }
+        List<Integer> resolved = new ArrayList<>(raw.size());
+        for (Integer item : raw) {
+            resolved.add(item != null ? item : 0);
+        }
+        return resolved;
+    }
+
+    /**
+     * Résout une référence de chaîne en version preview lisible — see
+     * {@link ResourceResolver#getPreviewString(String)}.
+     *
+     * <p>La résolution brute passe par {@link #getString(String)} (chainage
+     * + cache) ; les spans appliqués sont ceux du NOM FINAL de la chaîne
+     * (une chaîne qui en référence une autre hérite des exemples de sa
+     * cible). Sans spans, la chaîne brute est retournée telle quelle.</p>
+     *
+     * @since 3.3
+     */
+    @Override
+    public String getPreviewString(String reference) {
+        String raw = getString(reference);
+        if (raw == null) {
+            return null;
+        }
+        String finalName = resolveFinalStringName(reference, 0);
+        if (finalName == null) {
+            return raw;
+        }
+        List<XliffSpan> spans = table.getStringXliffSpans(finalName, currentQualifier);
+        if (spans == null || spans.isEmpty()) {
+            return raw;
+        }
+        return XliffText.applyExamples(raw, spans);
+    }
+
+    /**
+     * Suit une chaîne de références {@code @string/} jusqu'au nom final.
+     *
+     * @param reference la référence (peut être un littéral)
+     * @param depth     profondeur actuelle (anti-boucle)
+     * @return le nom nu de la chaîne finale, ou {@code null} si la
+     *         référence n'est pas une {@code @string/} résolue
+     */
+    private String resolveFinalStringName(String reference, int depth) {
+        if (depth > MAX_CHAIN_DEPTH || reference == null
+                || !reference.startsWith("@string/")) {
+            return null;
+        }
+        String name = reference.substring("@string/".length());
+        String value = table.getString(name, currentQualifier);
+        if (value == null) {
+            return null;
+        }
+        if (value.startsWith("@string/")) {
+            return resolveFinalStringName(value, depth + 1);
+        }
+        return name;
+    }
+
+    /**
+     * Résout un pluriel en version preview lisible — see
+     * {@link ResourceResolver#getPreviewQuantityString(String, int)}.
+     *
+     * <p>Le texte brut passe par {@link #getQuantityString(String, int, Object...)}
+     * sans arguments (sélection CLDR + repli other + chainage, pattern
+     * intact) ; les spans appliqués sont ceux de la catégorie sélectionnée
+     * du plurals demandé. Sans spans, le texte brut est retourné.</p>
+     *
+     * @since 3.3
+     */
+    @Override
+    public String getPreviewQuantityString(String reference, int quantity) {
+        String raw = getQuantityString(reference, quantity);
+        if (raw == null) {
+            return null;
+        }
+        String name = reference != null && reference.startsWith("@plurals/")
+                ? reference.substring("@plurals/".length())
+                : reference;
+        Map<String, List<XliffSpan>> byCategory =
+                table.getPluralsXliffSpans(name, currentQualifier);
+        if (byCategory == null || byCategory.isEmpty()) {
+            return raw;
+        }
+        String category = PluralRules.select(currentQualifier.getLanguage(), quantity);
+        List<XliffSpan> spans = byCategory.get(category);
+        if (spans == null || spans.isEmpty()) {
+            // Même repli que la sélection du texte : other est obligatoire
+            // en CLDR, catégorie de dernier recours des traductions partielles.
+            spans = byCategory.get(PluralRules.CATEGORY_OTHER);
+        }
+        if (spans == null || spans.isEmpty()) {
+            return raw;
+        }
+        return XliffText.applyExamples(raw, spans);
     }
 
     /**
@@ -811,5 +957,6 @@ public class ResourceResolverImpl implements ResourceResolver {
         boolCache.clear();
         stringArrayCache.clear();
         pluralsCache.clear();
+        integerArrayCache.clear();
     }
 }

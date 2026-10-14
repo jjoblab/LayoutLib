@@ -103,7 +103,7 @@ Tous livrés ; le détail des classes, de l'API et des limitations est dans le `
 
 | Module | Package | Rôle | Interface principale |
 |--------|---------|------|----------------------|
-| `module-resources` | `jo.layoutlib.resources` | Résolution `@color/`, `@string/`, `@dimen/`, `@array/`, `@plurals/` (règles de pluriel CLDR), … | `ResourceResolver` (`ResourceResolverImpl`) |
+| `module-resources` | `jo.layoutlib.resources` | Résolution `@color/`, `@string/`, `@dimen/`, `@array/` (string-arrays + integer-arrays typés), `@plurals/` (règles de pluriel CLDR), segments `<xliff:g id/example>` → preview lisible, … | `ResourceResolver` (`ResourceResolverImpl`) |
 | `module-drawables` | `jo.layoutlib.drawables` | Parsing `<shape>`, `<selector>`, `<vector>`, `<layer-list>`, `<ripple>`, `<inset>`, `<bitmap>`, `<adaptive-icon>`, `<animated-vector>`, … | `DrawableResolver` (`DrawableResolverImpl`) |
 | `module-themes` | `jo.layoutlib.themes` | `themes.xml`, `styles.xml`, résolution `?attr/` | `ThemeResolver` (`ThemeResolverImpl`) |
 | `module-attributes` | `jo.layoutlib.attributes` | `<declare-styleable>`, formats d'attributs, `app:*` (application typée + repli réflexion setters) | `AttributeRegistry` (`AttributeRegistryImpl`), `CustomAttributeApplier` |
