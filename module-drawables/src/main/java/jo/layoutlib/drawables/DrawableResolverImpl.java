@@ -101,6 +101,9 @@ public class DrawableResolverImpl implements DrawableResolver {
     /** Parser d'icônes adaptatives (ADR 0116 — P4/L6). */
     private final AdaptiveIconParser adaptiveIconParser;
 
+    /** Parser d'animated-vectors (ADR 0116 — P5/L5). */
+    private final AnimatedVectorParser animatedVectorParser;
+
     /**
      * Construit un resolver avec un résolveur de resources et convertisseur.
      *
@@ -119,6 +122,7 @@ public class DrawableResolverImpl implements DrawableResolver {
         this.insetParser = new InsetParser(dimensionConverter);
         this.bitmapParser = new BitmapParser();
         this.adaptiveIconParser = new AdaptiveIconParser();
+        this.animatedVectorParser = new AnimatedVectorParser();
     }
 
     /**
@@ -225,6 +229,8 @@ public class DrawableResolverImpl implements DrawableResolver {
                 return createBitmapDrawable(xml, context);
             case "adaptive-icon":
                 return createAdaptiveIconDrawable(xml, context);
+            case "animated-vector":
+                return createAnimatedVectorDrawable(xml, context);
             default:
                 return null;
         }
@@ -275,6 +281,9 @@ public class DrawableResolverImpl implements DrawableResolver {
                 break;
             case "adaptive-icon":
                 config = adaptiveIconParser.parse(xml);
+                break;
+            case "animated-vector":
+                config = animatedVectorParser.parse(xml);
                 break;
             default:
                 config = null;
@@ -690,6 +699,92 @@ public class DrawableResolverImpl implements DrawableResolver {
             if (foreground != null) layers.add(foreground);
             if (layers.isEmpty()) return null;
             return new LayerDrawable(layers.toArray(new Drawable[0]));
+        }
+    }
+
+    /**
+     * Crée le rendu statique d'un animated-vector : sa <strong>première
+     * frame</strong> (ADR 0116 — P5/L5).
+     *
+     * <p>Deux stratégies, dans l'ordre :</p>
+     * <ol>
+     *   <li><strong>Inflation native complète</strong> (appareil uniquement) :
+     *       {@code Drawable.createFromXml()} sur le XML animated-vector entier —
+     *       donne un vrai {@code AnimatedVectorDrawable} posé sur sa frame
+     *       initiale, si toutes les références {@code @drawable/}/{@code @anim/}
+     *       résolvent dans les {@code Resources} du contexte. En JVM mockable,
+     *       {@code createFromXml} retourne null ({@code returnDefaultValues}) ;
+     *       toute exception (référence manquante) bascule silencieusement sur
+     *       la stratégie 2 ;</li>
+     *   <li><strong>Résolution LayoutLib</strong> (pipeline preview) : le
+     *       vector sous-jacent est résolu comme un calque de composite —
+     *       référence {@code android:drawable} prioritaire (forme API 24+),
+     *       puis drawable inline embarqué (forme API 21-23) — puis retourné
+     *       tel quel : c'est la première frame.</li>
+     * </ol>
+     *
+     * <p>Les cibles {@code <target>} ({@code @anim/}) ne sont jamais résolues :
+     * l'animation n'a pas de sens en preview statique.</p>
+     *
+     * <p>Philosophie placeholder : un animated-vector sans vector résolvable
+     * retourne {@code null} (l'appelant affiche son placeholder neutre),
+     * jamais d'exception.</p>
+     *
+     * @param xml     le XML source
+     * @param context le contexte Android (peut être {@code null} en JVM)
+     * @return la première frame (drawable du vector sous-jacent), ou {@code null}
+     */
+    private Drawable createAnimatedVectorDrawable(String xml, Context context) {
+        AnimatedVectorConfig config;
+        try {
+            config = animatedVectorParser.parse(xml);
+        } catch (DrawableException e) {
+            return null;
+        }
+
+        // 1. Inflation native (appareil) — AnimatedVectorDrawable réel
+        Drawable nativeDrawable = tryInflateNativeAnimatedVector(xml, context);
+        if (nativeDrawable != null) {
+            return nativeDrawable;
+        }
+
+        // 2. Résolution LayoutLib — première frame = drawable sous-jacent
+        if (!config.hasDrawable()) {
+            return null;
+        }
+        try {
+            return resolveLayerChild(
+                    config.getDrawableRef(), config.getDrawableXml(), context);
+        } catch (RuntimeException e) {
+            // Vector sous-jacent cassé — placeholder neutre, jamais d'exception
+            return null;
+        }
+    }
+
+    /**
+     * Tente l'inflation native d'un XML animated-vector complet via
+     * {@code Drawable.createFromXml()}.
+     *
+     * <p>Ne réussit que sur appareil, avec un contexte dont les
+     * {@code Resources} résolvent les références {@code @drawable/} et
+     * {@code @anim/} du XML. Retourne {@code null} en toute autre situation
+     * (JVM mockable, contexte sans resources, référence manquante) — sans
+     * jamais lever.</p>
+     */
+    private Drawable tryInflateNativeAnimatedVector(String xml, Context context) {
+        if (context == null) {
+            return null;
+        }
+        try {
+            XmlPullParserFactory factory = XmlPullParserFactory.newInstance();
+            factory.setNamespaceAware(true);
+            XmlPullParser parser = factory.newPullParser();
+            parser.setInput(new StringReader(xml));
+            return Drawable.createFromXml(context.getResources(), parser);
+        } catch (XmlPullParserException | IOException | RuntimeException e) {
+            // Référence @anim/@drawable non résolvable en Resources natives,
+            // ou resources indisponibles — repli résolution LayoutLib
+            return null;
         }
     }
 

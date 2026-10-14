@@ -34,6 +34,8 @@ dependencies {
     testRuntimeOnly(libs.junit.platform.launcher)
     testImplementation(libs.assertj.core)
     testImplementation(libs.kxml2)
+    // P5/L5 : mock du Context Android pour la branche « resources mockables »
+    testImplementation(libs.mockito.core)
     androidTestImplementation(libs.androidx.test.ext.junit)
 }
 

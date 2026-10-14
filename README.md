@@ -22,7 +22,8 @@ LayoutLib/
 ├── module-resources/         ← Module 2 : @color/, @string/, @dimen/      ✅ Intégré au pipeline
 ├── module-drawables/         ← Module 3 : <shape>, <selector>, <vector>,
 │                                             <layer-list>, <ripple>, <inset>,
-│                                             <bitmap>, <adaptive-icon>     ✅ Intégré au pipeline
+│                                             <bitmap>, <adaptive-icon>,
+│                                             <animated-vector>          ✅ Intégré au pipeline
 ├── module-themes/            ← Module 4 : themes.xml, ?attr/              ✅ Intégré au pipeline
 ├── module-attributes/        ← Module 5 : <declare-styleable>, app:*      ✅ Intégré (mode strict + application app:*)
 ├── module-layout/            ← Module 6 : measure/layout engine +
@@ -44,17 +45,17 @@ Package principal : `jo.layoutlib` (un sous-package par module : `jo.layoutlib.i
 |--------|--------|---------|------------------------------|
 | Module 1 — Inflater | ✅ Intégré | 85 classes | Cœur du pipeline (`RenderService`, `BridgeInflater`, `AttributeApplier` par famille de widgets) |
 | Module 2 — Resources | ✅ Intégré | 96 classes | `ResourceResolver` consulté pour `@color/`, `@string/`, `@dimen/`, `@array/` |
-| Module 3 — Drawables | ✅ Intégré | 34 classes | `DrawableResolver` consulté pour `@drawable/` (shapes, selectors, vectors, layer-lists, ripples, insets, bitmaps, **adaptive icons** — ADR 0116 P4/L6) |
+| Module 3 — Drawables | ✅ Intégré | 36 classes | `DrawableResolver` consulté pour `@drawable/` (shapes, selectors, vectors, layer-lists, ripples, insets, bitmaps, **adaptive icons** — P4/L6, **animated-vectors en première frame** — P5/L5) |
 | Module 4 — Themes | ✅ Intégré | 34 classes | `ThemeResolver` consulté pour `?attr/` (repli sur le thème natif) |
 | Module 5 — Attributes | ✅ Intégré | 42 classes | `AttributeRegistry` pilote le mode strict du `BridgeInflater` **et applique les attributs `app:*`** (attributs Material/AndroidX connus via setters natifs, vues custom via réflexion — ADR 0116 P3/L8) |
 | Module 6 — Layout | ✅ Intégré | 44 classes | `LayoutEngineImpl` fait la mesure + le layout ; `ConstraintSolver` (Cassowary) résout les contraintes ConstraintLayout |
 | Validation | ✅ Livré | 7 classes | Hors pipeline : catalogue de 50 layouts de comparaison |
 | layout-editor-app | ✅ Livré | 9 classes | Consomme l'ensemble (app d'édition visuelle, ouverture/SAF) |
-| **Total** | | **329 classes** | **~32 000 lignes** (main) |
+| **Total** | | **331 classes** | **~32 500 lignes** (main) |
 
 **Référence AOSP consultée :** https://android.googlesource.com/platform/frameworks/layoutlib (327 fichiers, 43 597 lignes) + tools/base/layoutlib-api (77 fichiers, 9 108 lignes)
 
-**Tests : 868 unitaires JVM** (842 via `./gradlew testAllModules` + 26 pour l'app via `:layout-editor-app:testDebugUnitTest`) **+ tests instrumentés** (`connectedAndroidTest`, catalogue de 50 layouts, cf. `validation/`). CI GitHub Actions : `.github/workflows/ci.yml`.
+**Tests : 700 unitaires JVM** (674 via `./gradlew testAllModules` + 26 pour l'app via `:layout-editor-app:testDebugUnitTest`) **+ tests instrumentés** (`connectedAndroidTest`, catalogue de 50 layouts, cf. `validation/`). CI GitHub Actions : `.github/workflows/ci.yml`.
 
 ## Démarrage rapide
 
