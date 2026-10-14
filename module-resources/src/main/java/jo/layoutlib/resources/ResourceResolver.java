@@ -137,6 +137,21 @@ public interface ResourceResolver {
     void setLanguage(String language);
 
     /**
+     * Définit le smallest width simulé en dp (ADR 0116 — L1).
+     *
+     * <p>Après cet appel, les resources tablette (ex.
+     * {@code res/values-sw600dp/dimens.xml}) l'emportent sur les resources
+     * par défaut, avec repli automatique sur {@code res/values/} quand la
+     * resource manque — et sans jamais concourir pour la config téléphone
+     * (sw &lt; 600).</p>
+     *
+     * @param smallestWidthDp le smallest width de l'écran simulé (ex. 600,
+     *                        720), 0 pour revenir à la config sans dimension
+     * @since 3.1
+     */
+    void setSmallestScreenWidth(int smallestWidthDp);
+
+    /**
      * Vide le cache des valeurs résolues.
      */
     void clearCache();
