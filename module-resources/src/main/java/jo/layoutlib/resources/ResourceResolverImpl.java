@@ -502,21 +502,30 @@ public class ResourceResolverImpl implements ResourceResolver {
     @Override
     public void setNightMode(boolean nightMode) {
         this.currentQualifier = new ResourceQualifier(
-                nightMode, currentQualifier.isLandscape(), currentQualifier.getApiLevel());
+                nightMode, currentQualifier.isLandscape(), currentQualifier.getApiLevel(),
+                currentQualifier.getLanguage(), currentQualifier.getRegion(),
+                currentQualifier.getSmallestScreenWidth(), currentQualifier.getScreenWidth(),
+                currentQualifier.getScreenHeight());
         clearCache();
     }
 
     @Override
     public void setLandscape(boolean landscape) {
         this.currentQualifier = new ResourceQualifier(
-                currentQualifier.isNight(), landscape, currentQualifier.getApiLevel());
+                currentQualifier.isNight(), landscape, currentQualifier.getApiLevel(),
+                currentQualifier.getLanguage(), currentQualifier.getRegion(),
+                currentQualifier.getSmallestScreenWidth(), currentQualifier.getScreenWidth(),
+                currentQualifier.getScreenHeight());
         clearCache();
     }
 
     @Override
     public void setApiLevel(int apiLevel) {
         this.currentQualifier = new ResourceQualifier(
-                currentQualifier.isNight(), currentQualifier.isLandscape(), apiLevel);
+                currentQualifier.isNight(), currentQualifier.isLandscape(), apiLevel,
+                currentQualifier.getLanguage(), currentQualifier.getRegion(),
+                currentQualifier.getSmallestScreenWidth(), currentQualifier.getScreenWidth(),
+                currentQualifier.getScreenHeight());
         clearCache();
     }
 
@@ -524,7 +533,9 @@ public class ResourceResolverImpl implements ResourceResolver {
     public void setLanguage(String language) {
         this.currentQualifier = new ResourceQualifier(
                 currentQualifier.isNight(), currentQualifier.isLandscape(),
-                currentQualifier.getApiLevel(), language, null);
+                currentQualifier.getApiLevel(), language, null,
+                currentQualifier.getSmallestScreenWidth(), currentQualifier.getScreenWidth(),
+                currentQualifier.getScreenHeight());
         clearCache();
     }
 
@@ -542,7 +553,62 @@ public class ResourceResolverImpl implements ResourceResolver {
     public void setLocale(String language, String region) {
         this.currentQualifier = new ResourceQualifier(
                 currentQualifier.isNight(), currentQualifier.isLandscape(),
-                currentQualifier.getApiLevel(), language, region);
+                currentQualifier.getApiLevel(), language, region,
+                currentQualifier.getSmallestScreenWidth(), currentQualifier.getScreenWidth(),
+                currentQualifier.getScreenHeight());
+        clearCache();
+    }
+
+    /**
+     * Définit le smallest width simulé en dp (ADR 0116 — L1) — see
+     * {@link ResourceResolver#setSmallestScreenWidth(int)}.
+     *
+     * <p>Exemple : {@code setSmallestScreenWidth(600)} active les dossiers
+     * {@code values-sw600dp/} ; {@code setSmallestScreenWidth(0)} les
+     * désactive (retour au repli universel {@code values/}).</p>
+     *
+     * @param smallestWidthDp le smallest width en dp, 0 pour aucun
+     * @since 3.1
+     */
+    @Override
+    public void setSmallestScreenWidth(int smallestWidthDp) {
+        this.currentQualifier = new ResourceQualifier(
+                currentQualifier.isNight(), currentQualifier.isLandscape(),
+                currentQualifier.getApiLevel(), currentQualifier.getLanguage(),
+                currentQualifier.getRegion(), smallestWidthDp,
+                currentQualifier.getScreenWidth(), currentQualifier.getScreenHeight());
+        clearCache();
+    }
+
+    /**
+     * Définit la largeur disponible simulée en dp (qualifiers
+     * {@code values-w600dp/} — ADR 0116 — L1).
+     *
+     * @param widthDp la largeur disponible en dp, 0 pour aucune
+     * @since 3.1
+     */
+    public void setScreenWidth(int widthDp) {
+        this.currentQualifier = new ResourceQualifier(
+                currentQualifier.isNight(), currentQualifier.isLandscape(),
+                currentQualifier.getApiLevel(), currentQualifier.getLanguage(),
+                currentQualifier.getRegion(), currentQualifier.getSmallestScreenWidth(),
+                widthDp, currentQualifier.getScreenHeight());
+        clearCache();
+    }
+
+    /**
+     * Définit la hauteur disponible simulée en dp (qualifiers
+     * {@code values-h720dp/} — ADR 0116 — L1).
+     *
+     * @param heightDp la hauteur disponible en dp, 0 pour aucune
+     * @since 3.1
+     */
+    public void setScreenHeight(int heightDp) {
+        this.currentQualifier = new ResourceQualifier(
+                currentQualifier.isNight(), currentQualifier.isLandscape(),
+                currentQualifier.getApiLevel(), currentQualifier.getLanguage(),
+                currentQualifier.getRegion(), currentQualifier.getSmallestScreenWidth(),
+                currentQualifier.getScreenWidth(), heightDp);
         clearCache();
     }
 
