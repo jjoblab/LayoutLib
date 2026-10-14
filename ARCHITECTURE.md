@@ -104,7 +104,7 @@ Tous livrés ; le détail des classes, de l'API et des limitations est dans le `
 | Module | Package | Rôle | Interface principale |
 |--------|---------|------|----------------------|
 | `module-resources` | `jo.layoutlib.resources` | Résolution `@color/`, `@string/`, `@dimen/`, … | `ResourceResolver` (`ResourceResolverImpl`) |
-| `module-drawables` | `jo.layoutlib.drawables` | Parsing `<shape>`, `<selector>`, `<vector>`, `<layer-list>`, `<ripple>`, `<inset>`, `<bitmap>`, `<adaptive-icon>`, … | `DrawableResolver` (`DrawableResolverImpl`) |
+| `module-drawables` | `jo.layoutlib.drawables` | Parsing `<shape>`, `<selector>`, `<vector>`, `<layer-list>`, `<ripple>`, `<inset>`, `<bitmap>`, `<adaptive-icon>`, `<animated-vector>`, … | `DrawableResolver` (`DrawableResolverImpl`) |
 | `module-themes` | `jo.layoutlib.themes` | `themes.xml`, `styles.xml`, résolution `?attr/` | `ThemeResolver` (`ThemeResolverImpl`) |
 | `module-attributes` | `jo.layoutlib.attributes` | `<declare-styleable>`, formats d'attributs, `app:*` (application typée + repli réflexion setters) | `AttributeRegistry` (`AttributeRegistryImpl`), `CustomAttributeApplier` |
 | `module-layout` | `jo.layoutlib.layout` | Algorithmes measure/layout + résolution de contraintes ConstraintLayout (solver Cassowary : chaînes, guidelines, barrières, ratios) | `LayoutEngine` (`LayoutEngineImpl`), `ConstraintSolver` |
