@@ -204,8 +204,8 @@ class BridgeInflaterFactory2Test {
         }
 
         @Test
-        @DisplayName("une factory qui lève interrompt l'inflation (InflateException)")
-        void throwingFactoryInterruptsInflation() {
+        @DisplayName("une factory qui lève dégrade vers MockView (G15 — v3.4.0)")
+        void throwingFactoryDegradesToMockView() {
             LayoutInflater.Factory2 factory = new LayoutInflater.Factory2() {
                 @Override
                 public View onCreateView(View parent, String name, Context ctx,
@@ -221,11 +221,18 @@ class BridgeInflaterFactory2Test {
             };
             inflater.setFactory2(factory);
 
-            assertThatThrownBy(() -> inflater.inflate(
+            // v3.4.0 — G15 : une factory qui lève ne doit JAMAIS tuer la
+            // preview entière. On dégrade vers un MockView ambre.
+            // (Avant v3.4.0, l'inflation levait InflateException — c'était
+            // le contrat AOSP strict, mais trop fragile pour la preview.)
+            View root = inflater.inflate(
                     "<View " + NS + " android:layout_width=\"wrap_content\"\n"
-                            + " android:layout_height=\"wrap_content\"/>"))
-                    .isInstanceOf(InflateException.class)
-                    .hasMessageContaining("Factory2");
+                            + " android:layout_height=\"wrap_content\"/>");
+            assertThat(root).isNotNull();
+            // La Factory2 a été consultée puis a levé — le compteur
+            // n'incrémenterait que si elle retournait une vue non-null.
+            // Le MockView est créé en dehors du chemin factory.
+            assertThat(inflater.getFactoryViewCount()).isZero();
         }
 
         @Test

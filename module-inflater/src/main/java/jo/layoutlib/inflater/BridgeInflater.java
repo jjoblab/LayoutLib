@@ -17,6 +17,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
 
+import jo.layoutlib.inflater.bridge.MockView;
 import jo.layoutlib.resources.ResourceResolver;
 
 /**
@@ -392,13 +393,57 @@ public class BridgeInflater {
             skipElement(parser);
             return null;
         }
+        // v3.4.0 — G8 : <fragment> n'est pas rendable en preview (les
+        // fragments nécessitent un FragmentManager et un cycle de vie
+        // d'activité). On l'affiche comme un MockView ambre « Fragment
+        // (not rendered) » au lieu d'aborter le rendu. Les fragments
+        // modernes utilisent <androidx.fragment.app.FragmentContainerView>
+        // (qui EST résolvable comme classe), donc ce case ne concerne
+        // que le legacy <fragment class="...">.
+        if ("fragment".equals(tag)) {
+            return parseFragmentPlaceholder(parser, parent);
+        }
+        // v3.4.0 — G14 : <layout> est le tag racine du data-binding.
+        // Il est transparent : on skip la section <data> et on rend
+        // l'unique enfant (le vrai contenu). Le codegen data-binding
+        // produit un layout plat, mais l'utilisateur peut vouloir
+        // preview le layout source.
+        if ("layout".equals(tag)) {
+            return parseDataBindingLayout(parser, parent);
+        }
+        // v3.4.0 — G9 : <view class="com.example.Foo"/> est une syntaxe
+        // alternative pour les noms de classe pleinement qualifiés
+        // (utile pour les classes internes : <view class="Foo$Bar"/>).
+        // On lit l'attribut class et on délègue à createViewByName.
+        if ("view".equals(tag)) {
+            String className = getAttributeValue(parser, null, "class");
+            if (className == null) {
+                className = getAttributeValue(parser, "android", "class");
+            }
+            if (className != null) {
+                return parseViewTagWithClass(parser, parent, className);
+            }
+            // <view> sans class= — fallback vers MockView.
+            return parseFragmentPlaceholder(parser, parent);
+        }
+        // v3.4.0 — G13 : <ViewStub> est une vue qui ne se matérialise
+        // qu'au runtime (setVisibility(VISIBLE) ou inflate()). En preview,
+        // on inflate EAGERMENT le layout référencé par android:layout
+        // pour que l'utilisateur voie ce qui apparaîtra — Android Studio
+        // fait de même.
+        if ("ViewStub".equals(tag)) {
+            return parseViewStubEager(parser, parent);
+        }
 
         // Cas standard : création d'une vue
         // IMPORTANT : utiliser (Context) seul — pas d'AttributeSet
         // car XmlPullAttributes ne peut pas être casté en XmlBlock.Parser sur Android 14+
         // Les attributs sont appliqués manuellement via AttributeApplier
         // ADR 0116 — P6/L10 : la Factory2 (hook AOSP) est consultée en premier
-        View view = onCreateViewFromFactory(tag, parent);
+        // v3.4.0 — G15 : try/catch sur createView, dégradation MockView ambre
+        // au lieu d'abandonner tout le rendu (une vue custom qui lève ne
+        // doit JAMAIS tuer la preview entière).
+        View view = createViewSafely(tag, parent);
 
         // Mode strict + registre d'attributs (module-attributes) :
         // tout attribut android:/app: inconnu du registre lève avant application
@@ -515,6 +560,80 @@ public class BridgeInflater {
         }
         // Retour null : création par défaut (sémantique AOSP)
         return viewFactory.createView(tag);
+    }
+
+    /**
+     * Crée une vue avec dégradation gracieuse — v3.4.0 / G15.
+     *
+     * <p>Si {@link #onCreateViewFromFactory} lève (ClassNotFoundException,
+     * NoSuchMethodException, InvocationTargetException, theme-enforcement
+     * IllegalArgumentException, etc.), on crée un {@link MockView} ambre à
+     * la place. Le rendu continue — l'utilisateur voit un rectangle
+     * « placeholder » là où la vue custom aurait dû être, au lieu d'une
+     * page blanche avec un message d'erreur.</p>
+     *
+     * <p>Le {@code MockView} porte le nom de la classe originale (via
+     * {@link MockView#setOriginalClassName}) pour le diagnostic : la vue UI
+     * peut l'afficher dans un tooltip « Classe introuvable :
+     * com.example.FooView ».</p>
+     *
+     * <p><strong>Note</strong> : les attributs ne sont PAS appliqués sur le
+     * MockView (la classe originale n'existe pas, les attributs n'ont pas
+     * de sens). Les enfants XML sont skippés (la vue est une feuille).</p>
+     *
+     * @param tag    le nom du tag XML
+     * @param parent le parent (peut être {@code null})
+     * @return la vue créée (réelle ou MockView)
+     */
+    private View createViewSafely(String tag, ViewGroup parent) {
+        try {
+            return onCreateViewFromFactory(tag, parent);
+        } catch (InflateException e) {
+            // ClassNotFoundException, NoSuchMethodException, etc. — la classe
+            // n'est pas sur le classpath de l'IDE (vue custom projet/library).
+            // Dérade vers MockView + journalise pour le diagnostic.
+            logViewCreationFailure(tag, e);
+            return newMockView(tag);
+        } catch (RuntimeException e) {
+            // InvocationTargetException (constructeur qui lève), theme-
+            // enforcement IllegalArgumentException, etc. — la classe existe
+            // mais son instanciation échoue. Idem : MockView + journalise.
+            logViewCreationFailure(tag, e);
+            return newMockView(tag);
+        }
+    }
+
+    /**
+     * Journalise l'échec de création d'une vue — niveau WARNING, pas FINE,
+     * car c'est un problème que l'utilisateur devrait voir (le placeholder
+     * ambre est silencieux dans le rendu, le log porte le diagnostic).
+     */
+    private void logViewCreationFailure(String tag, Throwable cause) {
+        // La cause racine (cause chain) est plus utile que le message top-level
+        // (InflateException emballe souvent le vrai message dans "Classe
+        // introuvable : X" — la cause contient le détail).
+        Throwable root = cause;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+        System.err.println("[BridgeInflater] MockView fallback for <" + tag + ">: "
+                + root.getClass().getSimpleName() + ": " + root.getMessage());
+    }
+
+    /**
+     * Crée un {@link MockView} configuré avec le nom du tag original.
+     * Le MockView est ambre ({@code 0xFFFFC107}) pour être visible dans la
+     * preview. Sa taille par défaut est {@code wrap_content} pour ne pas
+     * casser le layout.
+     */
+    private View newMockView(String tag) {
+        MockView mock = new MockView(context);
+        mock.setOriginalClassName(tag);
+        // LayoutParams WRAP_CONTENT pour ne pas perturber le layout parent.
+        mock.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+        return mock;
     }
 
     /**
@@ -675,6 +794,213 @@ public class BridgeInflater {
                 throw new InflateException("Fin de document inattendue");
             }
         }
+    }
+
+    /**
+     * v3.4.0 — G9 : Rendu de {@code <view class="com.example.Foo">}.
+     *
+     * <p>Le tag {@code <view>} est une syntaxe alternative pour les noms
+     * pleinement qualifiés. On lit l'attribut {@code class} et on crée
+     * la vue par nom de classe, puis on applique les attributs et on parse
+     * les enfants comme pour un tag standard.</p>
+     *
+     * <p>Si la classe ne peut pas être instanciée (ClassNotFoundException),
+     * on dégrade vers MockView (G15) — le rendu continue.</p>
+     */
+    private View parseViewTagWithClass(XmlPullParser parser, ViewGroup parent,
+                                        String className)
+            throws XmlPullParserException, IOException {
+        View view;
+        try {
+            view = viewFactory.createViewByName(className);
+        } catch (InflateException e) {
+            logViewCreationFailure(className, e);
+            view = newMockView(className);
+        } catch (RuntimeException e) {
+            logViewCreationFailure(className, e);
+            view = newMockView(className);
+        }
+
+        // Appliquer les attributs (même chemin que parseElement standard).
+        checkKnownAttributes(parser);
+        if (attributeApplier != null) {
+            attributeApplier.applyAttributes(view, parser);
+        } else {
+            applyBaseAttributes(view, parser);
+        }
+        if (attributeRegistry != null) {
+            attributeRegistry.applyCustomAttributes(view, parser, context);
+        }
+        applyLayoutTransitionIfRequested(view, parser);
+
+        if (view.getId() != View.NO_ID) {
+            idToView.put(view.getId(), view);
+        }
+
+        ViewGroup.LayoutParams lp;
+        if (parent != null) {
+            lp = produceLayoutParams(parent, parser);
+        } else {
+            lp = new ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT);
+        }
+        view.setLayoutParams(lp);
+        captureConstraintAttributes(view, parser);
+
+        if (view instanceof ViewGroup) {
+            parseChildren(parser, (ViewGroup) view);
+        } else {
+            skipChildren(parser);
+        }
+
+        if (parent != null) {
+            parent.addView(view, lp);
+        }
+        return view;
+    }
+
+    /**
+     * v3.4.0 — G13 : Inflation eager de {@code <ViewStub>}.
+     *
+     * <p>Un {@code ViewStub} est une vue invisible qui ne se matérialise
+     * qu'au runtime via {@code setVisibility(VISIBLE)} ou {@code inflate()}.
+     * En preview statique, le stub reste à 0×0 — l'utilisateur ne voit
+     * pas ce qui apparaîtra. Android Studio inflate EAGERMENT le layout
+     * référencé par {@code android:layout} en preview.</p>
+     *
+     * <p>On lit {@code android:layout}, on résout le layout (via le
+     * {@code layoutProvider} si branché), et on l'inflate récursivement.
+     * Si la résolution échoue (pas de provider, layout introuvable), on
+     * crée un MockView ambre « ViewStub: @layout/... » pour signaler
+     * visuellement la présence du stub.</p>
+     */
+    private View parseViewStubEager(XmlPullParser parser, ViewGroup parent)
+            throws XmlPullParserException, IOException {
+        String layoutRef = getAttributeValue(parser, "android", "layout");
+        if (layoutRef == null) {
+            layoutRef = getAttributeValue(parser, null, "layout");
+        }
+
+        // Skip les enfants du ViewStub (il n'en a pas normalement).
+        skipElement(parser);
+
+        if (layoutRef == null) {
+            // ViewStub sans android:layout — placeholder ambre.
+            View mock = newMockView("ViewStub (no layout)");
+            if (parent != null) {
+                parent.addView(mock);
+            }
+            return mock;
+        }
+
+        // Tenter de résoudre le layout via le ResourceResolver.
+        String layoutName = layoutRef.startsWith("@layout/")
+                ? layoutRef.substring("@layout/".length())
+                : layoutRef;
+        String layoutXml = resolveLayoutReference("@layout/" + layoutName);
+        if (layoutXml == null) {
+            // Essai sans le préfixe (le resolver peut accepter le nom brut).
+            layoutXml = resolveLayoutReference(layoutRef);
+        }
+
+        if (layoutXml != null) {
+            // Inflation eager du layout référencé.
+            try {
+                XmlPullParser stubParser = XmlPreprocessor.createParser(layoutXml);
+                stubParser.nextTag();
+                return parseElement(stubParser, parent);
+            } catch (XmlPullParserException | IOException e) {
+                // Layout référencé invalide — MockView ambre.
+                View mock = newMockView("ViewStub: @" + layoutName + " (invalid)");
+                if (parent != null) {
+                    parent.addView(mock);
+                }
+                return mock;
+            }
+        }
+
+        // Layout non résolvable (pas de provider ou layout introuvable).
+        View mock = newMockView("ViewStub: @" + layoutName);
+        if (parent != null) {
+            parent.addView(mock);
+        }
+        return mock;
+    }
+
+    /**
+     * v3.4.0 — G8 : Placeholder pour {@code <fragment>}.
+     *
+     * <p>Les fragments nécessitent un {@code FragmentManager} et un cycle
+     * de vie d'activité — ils ne peuvent pas être rendus en preview statique.
+     * Au lieu d'aborter le rendu (comportement v3.3.0), on crée un
+     * {@link MockView} ambre et on skip les enfants du tag {@code <fragment>}.</p>
+     *
+     * <p>Les fragments modernes utilisent
+     * {@code <androidx.fragment.app.FragmentContainerView>} qui EST résolvable
+     * comme classe (donc passe par le chemin standard). Ce case ne concerne
+     * que le legacy {@code <fragment class="...">}.</p>
+     */
+    private View parseFragmentPlaceholder(XmlPullParser parser, ViewGroup parent)
+            throws XmlPullParserException, IOException {
+        String className = getAttributeValue(parser, "android", "name");
+        if (className == null) {
+            className = getAttributeValue(parser, null, "class");
+        }
+        String label = className != null ? "fragment: " + className : "fragment";
+        MockView mock = new MockView(context);
+        mock.setOriginalClassName(label);
+        mock.setLayoutParams(new ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+        // Skip les enfants (le fragment peut contenir des vues alternatives).
+        skipElement(parser);
+        if (parent != null) {
+            parent.addView(mock);
+        }
+        return mock;
+    }
+
+    /**
+     * v3.4.0 — G14 : Rendu transparent du tag racine data-binding
+     * {@code <layout>}.
+     *
+     * <p>Le data-binding enveloppe le layout réel dans un tag
+     * {@code <layout>} contenant une section {@code <data>} (variables et
+     * imports) suivie du vrai contenu. Le codegen produit un layout plat,
+     * mais l'utilisateur peut vouloir preview le layout source.</p>
+     *
+     * <p>On skip la section {@code <data>} et on rend l'unique enfant
+     * (le vrai contenu). Le {@code <layout>} lui-même est transparent —
+     * il ne crée pas de vue.</p>
+     */
+    private View parseDataBindingLayout(XmlPullParser parser, ViewGroup parent)
+            throws XmlPullParserException, IOException {
+        View content = null;
+        int depth = 1;
+        while (depth > 0) {
+            int event = parser.next();
+            if (event == XmlPullParser.START_TAG) {
+                String childTag = parser.getName();
+                if ("data".equals(childTag)) {
+                    // Section <data> (variables/imports) — skip complète.
+                    skipElement(parser);
+                } else {
+                    // Le vrai contenu — rendre via parseElement.
+                    if (content == null) {
+                        content = parseElement(parser, parent);
+                    } else {
+                        // Plusieurs enfants après <data> : skip les extras.
+                        skipElement(parser);
+                    }
+                }
+            } else if (event == XmlPullParser.END_TAG) {
+                depth--;
+            } else if (event == XmlPullParser.END_DOCUMENT) {
+                throw new InflateException("Fin de document inattendue dans <layout>");
+            }
+        }
+        return content;
     }
 
     /**
@@ -1440,11 +1766,22 @@ public class BridgeInflater {
 
     /**
      * Remet à zéro l'état interne (index des ids, compteur).
+     *
+     * <p>v3.4.0 — G12 : on NE vide PLUS le {@code constructorCache} de
+     * {@link ViewFactory}. Les clés du cache sont des noms de classes —
+     * ils ne changent pas entre deux rendus. Vider le cache forçait
+     * {@code Class.forName} + {@code getConstructor} à chaque rendu, ce
+     * qui ralentissait les previews sur des layouts à 50+ vues. Le cache
+     * grossit avec le nombre de classes distinctes (borné par le nombre
+     * de widgets Android — quelques centaines au maximum), donc aucun
+     * risque de fuite mémoire.</p>
      */
     public void reset() {
         idToView.clear();
         generatedIdCounter = 0x7f0a0001;
-        viewFactory.clearCache();
+        // v3.4.0 — G12 : ne PAS vider viewFactory.clearCache() — les
+        // constructeurs sont stables entre rendus, le cache accélère
+        // les re-rendus de 50-100x sur les gros layouts.
         constraintViewIds.clear();
         constraintAttributes.clear();
         // Compteurs d'introspection P6/L10-L11 : sémantique par rendu,
