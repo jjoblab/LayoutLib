@@ -34,6 +34,8 @@ dependencies {
     testRuntimeOnly(libs.junit.platform.launcher)
     testImplementation(libs.assertj.core)
     testImplementation(libs.kxml2)
+    // ADR 0116 — P3/L8 : mock des vues pour vérifier les appels de setters
+    testImplementation(libs.mockito.core)
     androidTestImplementation(libs.androidx.test.ext.junit)
 }
 

@@ -337,6 +337,14 @@ public class BridgeInflater {
             applyBaseAttributes(view, parser);
         }
 
+        // ADR 0116 — P3/L8 : application des attributs app:* du namespace
+        // res-auto via le registre d'attributs (attributs Material/AndroidX
+        // connus + repli réflexion pour les vues custom). Les app:layout_constraint*
+        // restent au solver Cassowary (P2/L9).
+        if (attributeRegistry != null) {
+            attributeRegistry.applyCustomAttributes(view, parser, context);
+        }
+
         // Enregistrement dans la map des ids si la vue a un id
         if (view.getId() != View.NO_ID) {
             idToView.put(view.getId(), view);
@@ -442,6 +450,10 @@ public class BridgeInflater {
         childInflater.setResourceResolver(resourceResolver);
         if (attributeApplier != null) {
             childInflater.setAttributeApplier(attributeApplier);
+        }
+        // ADR 0116 — P3/L8 : le registre d'attributs (app:*) suit les <include>
+        if (attributeRegistry != null) {
+            childInflater.setAttributeRegistry(attributeRegistry);
         }
         View firstChild = childInflater.inflate(includedXml, parent);
         return firstChild;

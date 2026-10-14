@@ -12,6 +12,7 @@ import java.util.Map;
 
 import jo.layoutlib.attributes.api.AttributeDefinitionImpl;
 import jo.layoutlib.attributes.format.FormatRegistry;
+import jo.layoutlib.attributes.registry.CustomAttributeApplier;
 import jo.layoutlib.attributes.registry.FrameworkAttributeRegistry;
 import jo.layoutlib.attributes.registry.MaterialAttributeRegistry;
 import jo.layoutlib.attributes.registry.AndroidXAttributeRegistry;
@@ -27,12 +28,21 @@ import jo.layoutlib.resources.DimensionConverter;
  */
 public class AttributeRegistryImpl implements AttributeRegistry {
 
+    /** URI du namespace app: (res-auto) — attributs custom. */
+    static final String NS_APP = "http://schemas.android.com/apk/res-auto";
+
     /** Tag de journalisation. */
     private static final String TAG = "AttrRegistry";
 
     private final Map<String, AttributeDefinitionImpl> attributes = new HashMap<>();
     private final Map<String, java.util.List<String>> styleables = new HashMap<>();
     private final CompositeAttributeRegistry compositeRegistry;
+
+    /** Appliqueur typé des attributs app: (ADR 0116 — P3/L8). */
+    private final CustomAttributeApplier customApplier;
+
+    /** Nombre d attributs app: appliqués au dernier appel applyCustomAttributes. */
+    private int lastCustomAppliedCount;
 
     public AttributeRegistryImpl() {
         this(null);
@@ -43,6 +53,7 @@ public class AttributeRegistryImpl implements AttributeRegistry {
         this.compositeRegistry.addRegistry(new FrameworkAttributeRegistry());
         this.compositeRegistry.addRegistry(new MaterialAttributeRegistry());
         this.compositeRegistry.addRegistry(new AndroidXAttributeRegistry());
+        this.customApplier = new CustomAttributeApplier(converter);
     }
 
     @Override
@@ -152,7 +163,49 @@ public class AttributeRegistryImpl implements AttributeRegistry {
 
     @Override
     public void applyCustomAttributes(View view, XmlPullParser parser, Context context) {
-        // Délègue à l'applier
+        if (view == null || parser == null) {
+            lastCustomAppliedCount = 0;
+            return;
+        }
+        int applied = 0;
+        int attrCount = parser.getAttributeCount();
+        for (int i = 0; i < attrCount; i++) {
+            String ns = parser.getAttributeNamespace(i);
+            // Seuls les attributs du namespace app: (res-auto) sont customs
+            if (ns == null || !NS_APP.equals(ns)) {
+                continue;
+            }
+            String name = parser.getAttributeName(i);
+            String value = parser.getAttributeValue(i);
+            if (name == null || name.isEmpty() || value == null || value.isEmpty()) {
+                continue;
+            }
+            // ADR 0116 — P2/L9 : les app:layout_constraint* appartiennent au
+            // solver Cassowary (positions résolues après le rendu)
+            if (name.startsWith("layout_constraint")) {
+                continue;
+            }
+            if (customApplier.apply(view, name, value, context)) {
+                applied++;
+            } else {
+                Log.d(TAG, "Attribut app: sans setter, ignoré : " + name);
+            }
+        }
+        lastCustomAppliedCount = applied;
+    }
+
+    /**
+     * Nombre d attributs {@code app:} appliqués lors du dernier appel à
+     * {@link #applyCustomAttributes(View, XmlPullParser, Context)}.
+     *
+     * <p>Expose le résultat pour les tests et la télémétrie de preview sans
+     * casser la signature {@code void} de l interface.</p>
+     *
+     * @return le nombre d attributs appliqués (0 si aucun ou dernier appel
+     *         invalide)
+     */
+    public int getLastCustomAppliedCount() {
+        return lastCustomAppliedCount;
     }
 
     @Override

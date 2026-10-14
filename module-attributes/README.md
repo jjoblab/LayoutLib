@@ -49,10 +49,31 @@ Integer flagValue = attr.getFlagValue("bold|italic");  // 3 (OR)
 | JVM | `AttributeFormatTest` | 8 |
 | JVM | `AttributeDefinitionTest` | 14 |
 | JVM | `AttributeRegistryImplTest` | 11 |
-| **Total** | | **33 cas** |
+| JVM | `CustomAttributeApplierTest` (P3/L8) | 18 |
+| JVM | `AttributeRegistryImplCustomAttributesTest` (P3/L8) | 8 |
+| **Total** | | **59 cas** |
+
+## Application des attributs app: (ADR 0116 — P3/L8)
+
+`AttributeRegistryImpl.applyCustomAttributes(view, parser, context)` est
+invoquée par le `BridgeInflater` pour chaque vue créée (registre par défaut
+installé par le `RenderService`, remplaçable par
+`RenderService.setAttributeRegistry(...)`) :
+
+- énumère les attributs du namespace `app:` (res-auto) sur le tag courant ;
+- **attributs connus** Material/AndroidX (elevation, backgroundTint,
+  card*, contentPadding*, cornerRadius, tint…) appliqués via les setters
+  natifs des vues framework (un `CardView` prévisualisé = `FrameLayout`) ;
+- **attributs sans setter natif** (layout_behavior, fabSize, strokeWidth…)
+  reconnus et neutralisés — plus d'avertissement parasite ;
+- **attributs inconnus** (vues custom, DataBinding) : repli réflexion sur les
+  `set<Name>(String/int/float/boolean/...)` avec cache — comme l'AOSP
+  layoutlib pour les vues custom ;
+- les `app:layout_constraint*` restent au solver Cassowary (P2/L9).
 
 ## Limitations v1.0
 
-- ❌ `applyCustomAttributes()` est un stub — l'application réelle via réflexion sur les setters est à implémenter
+- ✅ ~~`applyCustomAttributes()` est un stub~~ — implémenté (P3/L8) :
+  application typée + repli réflexion, câblée au pipeline
 - ❌ Pas de résolution des références `@color/`, `@dimen/` dans les valeurs d'attributs
 - ❌ Pas de support des attributs hérités via `parent` sur les styleables
