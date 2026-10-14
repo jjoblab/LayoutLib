@@ -73,6 +73,12 @@ import jo.layoutlib.themes.ThemeResolver;
  * {@link DrawableResolver} connecté (shapes, selectors, vectors) avec
  * repli sur les {@code Resources} natives.</p>
  *
+ * <p>Depuis l'ADR 0116 — L7, les attributs de thème {@code ?attr/} suivis
+ * d'un drawable ({@code android:background="?attr/selectableItemBackground"})
+ * sont résolus jusqu'au drawable : la couleur du thème a la priorité, sinon
+ * la référence {@code @drawable/} est déléguée au
+ * {@link DrawableResolver} (background, {@code android:src}, foreground).</p>
+ *
  * @author jo@Dev
  * @since 1.0
  */
@@ -689,7 +695,14 @@ public final class AttributeApplier {
                 if (d != null) view.setBackground(d);
             } else if (value.startsWith("?attr/") || value.startsWith("?android:attr/")) {
                 Integer color = resolveThemeAttr(value);
-                if (color != null) view.setBackground(new ColorDrawable(color));
+                if (color != null) {
+                    view.setBackground(new ColorDrawable(color));
+                } else {
+                    // ADR 0116 — L7 : l'attribut de thème peut pointer vers
+                    // un drawable (selectableItemBackground, icônes thémées)
+                    Drawable d = resolveThemeDrawableAttr(value);
+                    if (d != null) view.setBackground(d);
+                }
             }
         } catch (RuntimeException e) { logAttrError("tickVisible", e); }
     }
@@ -704,6 +717,10 @@ public final class AttributeApplier {
                 String name = value.substring("@android:drawable/".length());
                 int id = context.getResources().getIdentifier(name, "drawable", "android");
                 if (id != 0) iv.setImageResource(id);
+            } else if (value.startsWith("?attr/") || value.startsWith("?android:attr/")) {
+                // ADR 0116 — L7 : android:src="?attr/…" vers un drawable
+                Drawable d = resolveThemeDrawableAttr(value);
+                if (d != null) iv.setImageDrawable(d);
             }
         } catch (RuntimeException e) { logAttrError("tickVisible", e); }
     }
@@ -718,6 +735,22 @@ public final class AttributeApplier {
                 Integer color = resolveColor(value);
                 if (color != null && view instanceof FrameLayout) {
                     ((FrameLayout) view).setForeground(new ColorDrawable(color));
+                }
+            } else if (value.startsWith("@drawable/")) {
+                Drawable d = resolveDrawable(value);
+                if (d != null && view instanceof FrameLayout) {
+                    ((FrameLayout) view).setForeground(d);
+                }
+            } else if (value.startsWith("?attr/") || value.startsWith("?android:attr/")) {
+                Integer color = resolveThemeAttr(value);
+                if (color != null && view instanceof FrameLayout) {
+                    ((FrameLayout) view).setForeground(new ColorDrawable(color));
+                } else {
+                    // ADR 0116 — L7 : ?attr/ vers drawable de premier plan
+                    Drawable d = resolveThemeDrawableAttr(value);
+                    if (d != null && view instanceof FrameLayout) {
+                        ((FrameLayout) view).setForeground(d);
+                    }
                 }
             }
         } catch (RuntimeException e) { logAttrError("tickVisible", e); }
@@ -1211,6 +1244,96 @@ public final class AttributeApplier {
             }
             if (value.resourceId != 0) {
                 try { return context.getResources().getColor(value.resourceId, context.getTheme()); } catch (android.content.res.Resources.NotFoundException e) { return null; }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Résout un attribut de thème {@code ?attr/} ou {@code ?android:attr/}
+     * vers un {@link Drawable} (ADR 0116 — L7).
+     *
+     * <p>Contrairement à {@link #resolveThemeAttr(String)}, qui ne conserve
+     * que les couleurs, cette variante suit la référence jusqu'au drawable :
+     * la valeur du style peut être un {@code @drawable/…} (retourné tel quel
+     * en String par le ThemeResolver — « résolue plus tard »), une référence
+     * {@code @color/} ou une couleur littérale, chacune déléguée à
+     * {@link #resolveDrawable(String)}.</p>
+     *
+     * <p>Ordre de résolution :</p>
+     * <ol>
+     *   <li>{@link ThemeResolver} connecté : valeur de l'attribut puis
+     *       résolution drawable</li>
+     *   <li>{@code Resources.Theme} natif : {@code resolveAttribute} puis
+     *       {@code getDrawable(resourceId)} (device uniquement — inert en
+     *       JVM mockable, {@code getIdentifier} renvoie 0)</li>
+     * </ol>
+     *
+     * <p>Un attribut non résolvable retourne {@code null} : l'attribut est
+     * ignoré, le rendu continue (jamais d'exception).</p>
+     *
+     * <p>Visibilité package : testable unitairement.</p>
+     *
+     * @param ref la référence (ex. {@code ?attr/selectableItemBackground})
+     * @return le Drawable, ou {@code null}
+     */
+    Drawable resolveThemeDrawableAttr(String ref) {
+        if (ref == null) return null;
+        // 1. ThemeResolver du projet : la valeur de l'attribut de thème
+        if (themeResolver != null) {
+            try {
+                Object value = themeResolver.resolveAttr(ref);
+                if (value instanceof Drawable) {
+                    return (Drawable) value;
+                }
+                if (value instanceof String) {
+                    Drawable d = resolveDrawable((String) value);
+                    if (d != null) {
+                        return d;
+                    }
+                }
+            } catch (RuntimeException e) {
+                Debug.logWarning("themes",
+                        "ThemeResolver a échoué pour " + ref + " : " + e);
+            }
+        }
+        // 2. Fallback natif : Resources.Theme → resourceId → getDrawable
+        if (context == null || context.getResources() == null
+                || context.getTheme() == null) {
+            return null;
+        }
+        String attrName;
+        boolean framework;
+        if (ref.startsWith("?android:attr/")) {
+            attrName = ref.substring("?android:attr/".length());
+            framework = true;
+        } else if (ref.startsWith("?attr/")) {
+            attrName = ref.substring("?attr/".length());
+            framework = false;
+        } else if (ref.startsWith("?")) {
+            attrName = ref.substring(1);
+            framework = false;
+        } else {
+            return null;
+        }
+        int attrId;
+        if (framework) {
+            attrId = context.getResources().getIdentifier(attrName, "attr", "android");
+        } else {
+            attrId = context.getResources().getIdentifier(attrName, "attr", context.getPackageName());
+            if (attrId == 0) {
+                attrId = context.getResources().getIdentifier(attrName, "attr", "android");
+            }
+        }
+        if (attrId == 0) return null;
+        android.util.TypedValue value = new android.util.TypedValue();
+        if (context.getTheme().resolveAttribute(attrId, value, true)
+                && value.resourceId != 0) {
+            try {
+                return context.getResources().getDrawable(value.resourceId, context.getTheme());
+            } catch (RuntimeException e) {
+                Debug.logWarning("themes",
+                        "Drawable natif introuvable pour " + ref + " : " + e);
             }
         }
         return null;
