@@ -1,8 +1,10 @@
 package jo.layoutlib.inflater;
 
 import android.util.Log;
+import android.animation.LayoutTransition;
 import android.content.Context;
 import android.util.AttributeSet;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
@@ -96,6 +98,17 @@ public class BridgeInflater {
     /** Indique si le inflater doit lever une exception sur les attributs inconnus. */
     private boolean strictMode = false;
 
+    /** Hook AOSP d'interception de création de vues (ADR 0116 — P6/L10).
+     *  Consulté AVANT la création par défaut ; retour null → ViewFactory. */
+    private LayoutInflater.Factory2 factory2;
+
+    /** Nombre de vues fournies par la Factory2 (introspection/tests). */
+    private int factoryViewCount = 0;
+
+    /** Nombre de LayoutTransition installés via animateLayoutChanges
+     *  (ADR 0116 — P6/L11, introspection/tests). */
+    private int layoutTransitionCount = 0;
+
     /** Registre d'attributs (module-attributes) pour le mode strict. */
     private jo.layoutlib.attributes.AttributeRegistry attributeRegistry;
 
@@ -163,6 +176,66 @@ public class BridgeInflater {
      */
     public AttributeApplier getAttributeApplier() {
         return attributeApplier;
+    }
+
+    /**
+     * Définit le hook {@link LayoutInflater.Factory2} d'interception de la
+     * création des vues (ADR 0116 — P6/L10).
+     *
+     * <p>Sémantique AOSP : la factory est consultée pour chaque tag de vue
+     * standard (hors {@code <include>}/{@code <merge>}/{@code <requestFocus>}/
+     * {@code <blink>}) AVANT la création par défaut. Si elle retourne une
+     * vue, celle-ci est utilisée telle quelle et suit le pipeline complet
+     * (attributs, LayoutParams, enfants) ; si elle retourne {@code null}, la
+     * création par défaut ({@link ViewFactory} par réflexion) prend le
+     * relais. Une factory qui lève interrompt l'inflation avec une
+     * {@link InflateException} (comme l'AOSP).</p>
+     *
+     * <p><strong>Contrat AOSP conservé</strong> : l'{@code AttributeSet}
+     * passé à la factory est {@code null} — le parser XML pull de LayoutLib
+     * n'est pas un {@code AttributeSet} Android (cf. l'avertissement
+     * XmlBlock.Parser sur Android 14+) ; les attributs XML sont appliqués
+     * ensuite par l'{@link AttributeApplier}, comme pour toute vue.</p>
+     *
+     * <p>Comme dans l'AOSP, une factory ne peut être définie qu'une fois :
+     * un second appel lève {@link IllegalStateException}. Le hook est
+     * propagé aux inflaters enfants créés pour les {@code <include>}.</p>
+     *
+     * @param factory la factory, ou {@code null} pour désactiver le hook
+     *                (uniquement si aucune factory n'a encore été définie)
+     * @throws IllegalStateException si une factory est déjà définie
+     */
+    public void setFactory2(LayoutInflater.Factory2 factory) {
+        if (this.factory2 != null && factory != null) {
+            throw new IllegalStateException(
+                    "Une Factory2 est déjà définie sur cet inflater "
+                            + "(contrat AOSP LayoutInflater.setFactory2)");
+        }
+        this.factory2 = factory;
+    }
+
+    /**
+     * @return la Factory2 courante, ou {@code null}
+     */
+    public LayoutInflater.Factory2 getFactory2() {
+        return factory2;
+    }
+
+    /**
+     * @return le nombre de vues effectivement fournies par la Factory2
+     *         lors des inflations (introspection/tests, ADR 0116 — P6/L10)
+     */
+    public int getFactoryViewCount() {
+        return factoryViewCount;
+    }
+
+    /**
+     * @return le nombre de LayoutTransition installés via
+     *         {@code android:animateLayoutChanges="true"}
+     *         (introspection/tests, ADR 0116 — P6/L11)
+     */
+    public int getAppliedLayoutTransitionCount() {
+        return layoutTransitionCount;
     }
 
     /**
@@ -324,7 +397,8 @@ public class BridgeInflater {
         // IMPORTANT : utiliser (Context) seul — pas d'AttributeSet
         // car XmlPullAttributes ne peut pas être casté en XmlBlock.Parser sur Android 14+
         // Les attributs sont appliqués manuellement via AttributeApplier
-        View view = viewFactory.createView(tag);
+        // ADR 0116 — P6/L10 : la Factory2 (hook AOSP) est consultée en premier
+        View view = onCreateViewFromFactory(tag, parent);
 
         // Mode strict + registre d'attributs (module-attributes) :
         // tout attribut android:/app: inconnu du registre lève avant application
@@ -344,6 +418,11 @@ public class BridgeInflater {
         if (attributeRegistry != null) {
             attributeRegistry.applyCustomAttributes(view, parser, context);
         }
+
+        // ADR 0116 — P6/L11 : android:animateLayoutChanges="true" installe un
+        // LayoutTransition (no-op visuel en preview statique, mais l'attribut
+        // est consommé fidèlement — jamais d'exception)
+        applyLayoutTransitionIfRequested(view, parser);
 
         // Enregistrement dans la map des ids si la vue a un id
         if (view.getId() != View.NO_ID) {
@@ -403,6 +482,76 @@ public class BridgeInflater {
     }
 
     /**
+     * Crée une vue pour un tag standard : Factory2 d'abord (ADR 0116 —
+     * P6/L10), création par défaut ensuite.
+     *
+     * <p>Sémantique AOSP {@code LayoutInflater.createViewFromTag()} : la
+     * factory reçoit le parent, le nom du tag, le contexte et un
+     * {@code AttributeSet} null (les attributs sont appliqués après coup par
+     * l'{@link AttributeApplier}, cf. javadoc de
+     * {@link #setFactory2(LayoutInflater.Factory2)}). Un retour null laisse
+     * la création par défaut ; une factory qui lève interrompt l'inflation.</p>
+     *
+     * @param tag    le nom du tag XML
+     * @param parent le parent (peut être {@code null} pour la racine)
+     * @return la vue créée
+     * @throws InflateException si aucune création ne réussit, ou si la
+     *                          factory lève
+     */
+    private View onCreateViewFromFactory(String tag, ViewGroup parent) {
+        if (factory2 == null) {
+            return viewFactory.createView(tag);
+        }
+        View view;
+        try {
+            view = factory2.onCreateView(parent, tag, context, null);
+        } catch (RuntimeException e) {
+            throw new InflateException(
+                    "La Factory2 a échoué pour <" + tag + "> : " + e.getMessage(), e);
+        }
+        if (view != null) {
+            factoryViewCount++;
+            return view;
+        }
+        // Retour null : création par défaut (sémantique AOSP)
+        return viewFactory.createView(tag);
+    }
+
+    /**
+     * Consomme {@code android:animateLayoutChanges} (ADR 0116 — P6/L11).
+     *
+     * <p>Sur un ViewGroup avec {@code "true"}, installe un
+     * {@link LayoutTransition} — fidèle au comportement Android
+     * ({@code ViewGroup.setLayoutTransition(new LayoutTransition())}) mais
+     * sans effet visuel en preview statique. Sur une vue simple ou à
+     * {@code false}, l'attribut est simplement consommé. Jamais d'exception
+     * (JVM mockable comprise).</p>
+     *
+     * @param view  la vue en cours de configuration
+     * @param parser le parser encore positionné sur son START_TAG
+     */
+    private void applyLayoutTransitionIfRequested(View view, XmlPullParser parser) {
+        String value = parser.getAttributeValue(
+                "http://schemas.android.com/apk/res/android", "animateLayoutChanges");
+        if (value == null) {
+            value = parser.getAttributeValue(null, "animateLayoutChanges");
+        }
+        if (value == null || !"true".equalsIgnoreCase(value.trim())) {
+            return;
+        }
+        if (!(view instanceof ViewGroup)) {
+            return; // attribute consommé mais sans effet sur une vue simple
+        }
+        try {
+            ((ViewGroup) view).setLayoutTransition(new LayoutTransition());
+            layoutTransitionCount++;
+        } catch (RuntimeException e) {
+            // LayoutTransition indisponible (JVM mockable selon la cible) —
+            // attribut consommé silencieusement, philosophie placeholder
+        }
+    }
+
+    /**
      * Parse un tag {@code <include layout="@layout/foo" />}.
      *
      * <p>Le layout référencé doit être résolvable via le
@@ -455,7 +604,16 @@ public class BridgeInflater {
         if (attributeRegistry != null) {
             childInflater.setAttributeRegistry(attributeRegistry);
         }
+        // ADR 0116 — P6/L10 : la Factory2 suit les <include> (l'enfant est
+        // neuf, pas de conflit au setFactory2)
+        if (factory2 != null) {
+            childInflater.setFactory2(factory2);
+        }
         View firstChild = childInflater.inflate(includedXml, parent);
+        // Les compteurs d'introspection (P6/L10-L11) remontent au inflater
+        // parent — les <include> ne créent pas de trous de comptage
+        this.factoryViewCount += childInflater.getFactoryViewCount();
+        this.layoutTransitionCount += childInflater.getAppliedLayoutTransitionCount();
         return firstChild;
     }
 
@@ -1289,6 +1447,10 @@ public class BridgeInflater {
         viewFactory.clearCache();
         constraintViewIds.clear();
         constraintAttributes.clear();
+        // Compteurs d'introspection P6/L10-L11 : sémantique par rendu,
+        // cohérente avec l'état de capture des contraintes
+        factoryViewCount = 0;
+        layoutTransitionCount = 0;
     }
 
     /**

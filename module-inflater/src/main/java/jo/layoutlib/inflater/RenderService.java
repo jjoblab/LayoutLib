@@ -193,6 +193,32 @@ public class RenderService {
     }
 
     /**
+     * Définit le hook {@code LayoutInflater.Factory2} du pipeline de rendu
+     * (ADR 0116 — P6/L10).
+     *
+     * <p>La factory est consultée pour chaque tag de vue standard avant la
+     * création par défaut : un hôte peut ainsi substituer ses propres vues
+     * (vues custom du projet utilisateur, placeholders enrichis, surcouches
+     * de sélection). Délègue à {@link BridgeInflater#setFactory2} — même
+     * sémantique AOSP (retour null → création par défaut, une seule factory
+     * par inflater, {@code AttributeSet} null).</p>
+     *
+     * @param factory la factory, ou {@code null} pour désactiver le hook
+     * @throws IllegalStateException si une factory est déjà définie
+     */
+    public void setFactory2(android.view.LayoutInflater.Factory2 factory) {
+        ensureNotReleased();
+        inflater.setFactory2(factory);
+    }
+
+    /**
+     * @return la Factory2 courante du pipeline, ou {@code null}
+     */
+    public android.view.LayoutInflater.Factory2 getFactory2() {
+        return inflater.getFactory2();
+    }
+
+    /**
      * Définit le résolveur de ressources du pipeline de rendu.
      *
      * <p>Le résolveur est propagé au {@link BridgeInflater} (pour les

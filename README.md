@@ -43,7 +43,7 @@ Package principal : `jo.layoutlib` (un sous-package par module : `jo.layoutlib.i
 
 | Module | Statut | Classes | Integration dans le pipeline |
 |--------|--------|---------|------------------------------|
-| Module 1 — Inflater | ✅ Intégré | 85 classes | Cœur du pipeline (`RenderService`, `BridgeInflater`, `AttributeApplier` par famille de widgets) |
+| Module 1 — Inflater | ✅ Intégré | 86 classes | Cœur du pipeline (`RenderService`, `BridgeInflater`, `AttributeApplier` par famille de widgets) ; **hook `LayoutInflater.Factory2`** + `animateLayoutChanges` consommé + accès sûr `ViewTreeObserver` (ADR 0116 P6/L10-L11) |
 | Module 2 — Resources | ✅ Intégré | 96 classes | `ResourceResolver` consulté pour `@color/`, `@string/`, `@dimen/`, `@array/` |
 | Module 3 — Drawables | ✅ Intégré | 36 classes | `DrawableResolver` consulté pour `@drawable/` (shapes, selectors, vectors, layer-lists, ripples, insets, bitmaps, **adaptive icons** — P4/L6, **animated-vectors en première frame** — P5/L5) |
 | Module 4 — Themes | ✅ Intégré | 34 classes | `ThemeResolver` consulté pour `?attr/` (repli sur le thème natif) |
@@ -51,11 +51,11 @@ Package principal : `jo.layoutlib` (un sous-package par module : `jo.layoutlib.i
 | Module 6 — Layout | ✅ Intégré | 44 classes | `LayoutEngineImpl` fait la mesure + le layout ; `ConstraintSolver` (Cassowary) résout les contraintes ConstraintLayout |
 | Validation | ✅ Livré | 7 classes | Hors pipeline : catalogue de 50 layouts de comparaison |
 | layout-editor-app | ✅ Livré | 9 classes | Consomme l'ensemble (app d'édition visuelle, ouverture/SAF) |
-| **Total** | | **331 classes** | **~32 500 lignes** (main) |
+| **Total** | | **332 classes** | **~32 600 lignes** (main) |
 
 **Référence AOSP consultée :** https://android.googlesource.com/platform/frameworks/layoutlib (327 fichiers, 43 597 lignes) + tools/base/layoutlib-api (77 fichiers, 9 108 lignes)
 
-**Tests : 700 unitaires JVM** (674 via `./gradlew testAllModules` + 26 pour l'app via `:layout-editor-app:testDebugUnitTest`) **+ tests instrumentés** (`connectedAndroidTest`, catalogue de 50 layouts, cf. `validation/`). CI GitHub Actions : `.github/workflows/ci.yml`.
+**Tests : 722 unitaires JVM** (696 via `./gradlew testAllModules` + 26 pour l'app via `:layout-editor-app:testDebugUnitTest`) **+ tests instrumentés** (`connectedAndroidTest`, catalogue de 50 layouts, cf. `validation/`). CI GitHub Actions : `.github/workflows/ci.yml`.
 
 ## Démarrage rapide
 
