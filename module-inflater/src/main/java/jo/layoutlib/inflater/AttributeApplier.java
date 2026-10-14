@@ -93,6 +93,14 @@ public final class AttributeApplier {
     private DrawableResolver drawableResolver;
     private ThemeResolver themeResolver;
 
+    /**
+     * v3.4.3 — G7 : Pile des thèmes overlay. Quand android:theme est
+     * present sur une vue, on push le theme overlay avant d'appliquer les
+     * attributs, et on le pop apres. Les ?attr/ references sont resolues
+     * contre le theme en haut de la pile (overlay) au lieu du theme de base.
+     */
+    private final java.util.Deque<String> themeOverlayStack = new java.util.ArrayDeque<>();
+
     /** Applier TextFamilyAttributes. */
     private final TextFamilyAttributes textFamilyAttributes = new TextFamilyAttributes(this);
     /** Applier ProgressFamilyAttributes. */
@@ -204,6 +212,9 @@ public final class AttributeApplier {
     public void applyAttributes(View view, XmlPullParser parser) {
         if (view == null || parser == null) return;
 
+        // v3.4.3 — G7 : push du theme overlay si android:theme est present.
+        boolean overlayActif = pushThemeOverlaySiPresent(view, parser);
+
         applyViewAttributes(view, parser);
 
         // Familles de widgets (ordre identique à l ancienne chaîne instanceof)
@@ -215,6 +226,11 @@ public final class AttributeApplier {
 
         // Attributs app: (Material Components, AndroidX)
         applyAppAttributes(view, parser);
+
+        // v3.4.3 — G7 : pop du theme overlay si on l'a push.
+        if (overlayActif) {
+            popThemeOverlay();
+        }
     }
 
     // ========================================================================
@@ -227,6 +243,9 @@ public final class AttributeApplier {
         if (style != null) {
             applyStyle(view, style);
         }
+
+        // v3.4.3 — G7 : android:theme overlay est gere dans applyAttributes
+        // (push avant applyViewAttributes, pop apres applyAppAttributes).
 
         String id = getAttr(parser, "id");
         if (id != null) view.setId(resolveViewId(id));
@@ -994,6 +1013,68 @@ public final class AttributeApplier {
         Debug.logWarning("attributes",
                 "Attribut '" + attr + "' ignoré : " + e.getClass().getSimpleName()
                         + (e.getMessage() != null ? " (" + e.getMessage() + ")" : ""));
+    }
+
+    /**
+     * v3.4.3 — G7 : Verifie si android:theme est present sur le parser.
+     * Si oui, push le theme overlay sur la pile et set le theme courant
+     * du ThemeResolver.
+     *
+     * @return true si un overlay a ete push (il faudra le pop apres)
+     */
+    private boolean pushThemeOverlaySiPresent(View view, XmlPullParser parser) {
+        if (themeResolver == null) return false;
+        String themeRef = getAttr(parser, "theme");
+        if (themeRef == null || themeRef.isEmpty()) return false;
+        pushThemeOverlay(view, themeRef);
+        return true;
+    }
+
+    /**
+     * v3.4.3 — G7 : Push un theme overlay sur la pile et set le theme
+     * courant du ThemeResolver.
+     *
+     * <p>Le theme precedent est sauve dans la pile pour etre restaure
+     * par popThemeOverlay(). Les ?attr/ references suivantes seront
+     * resolues contre l'overlay.</p>
+     *
+     * @param view la vue (unused — pour debug futur)
+     * @param themeRef la reference du theme (ex. @style/ThemeOverlay.App.Dark)
+     */
+    @SuppressWarnings("UnusedParameters")
+    private void pushThemeOverlay(View view, String themeRef) {
+        // Stripper le prefixe @style/ si present.
+        String nomStyle = themeRef;
+        if (nomStyle.startsWith("@style/")) {
+            nomStyle = nomStyle.substring("@style/".length());
+        } else if (nomStyle.startsWith("@android:style/")) {
+            nomStyle = nomStyle.substring("@android:style/".length());
+        }
+
+        // Sauver le theme courant (peut etre null si non configure).
+        // On utilise getCurrentTheme() si disponible, sinon null.
+        String themePrecedent = null;
+        try {
+            themePrecedent = (themeResolver instanceof jo.layoutlib.themes.ThemeResolverImpl)
+                ? ((jo.layoutlib.themes.ThemeResolverImpl) themeResolver).getCurrentTheme()
+                : null;
+        } catch (Throwable ignored) {
+            // Si on ne peut pas recuperer le theme courant, on push null.
+        }
+        themeOverlayStack.push(themePrecedent);
+
+        // Set le theme overlay comme theme courant.
+        themeResolver.setTheme(nomStyle);
+    }
+
+    /**
+     * v3.4.3 — G7 : Pop le theme overlay et restaure le theme precedent.
+     */
+    private void popThemeOverlay() {
+        String themePrecedent = themeOverlayStack.poll();
+        if (themeResolver != null) {
+            themeResolver.setTheme(themePrecedent);
+        }
     }
 
     /**
