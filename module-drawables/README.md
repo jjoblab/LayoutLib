@@ -3,7 +3,7 @@
 > Parsing et rendu des drawables XML : `<shape>`, `<selector>`, `<vector>`, `<layer-list>`, `<ripple>`, `<inset>`, `<bitmap>`, `<color>`, `<adaptive-icon>`, `<animated-vector>`.
 >
 > @author jo@Dev
-> **Statut :** ✅ Livré (Phase 3) — shape, selector, vector, color + composites (ADR 0116 P0/L3), adaptive icons (P4/L6) et animated-vectors — première frame (P5/L5)
+> **Statut :** ✅ Livré (Phase 3) — shape, selector (items inline L4), vector, color + composites (ADR 0116 P0/L3), adaptive icons (P4/L6) et animated-vectors — première frame (P5/L5)
 
 ## Responsabilité
 
@@ -63,6 +63,10 @@ Object config = resolver.parseConfig(xml);  // ShapeConfig, SelectorConfig, Vect
 - Items avec états : `state_pressed`, `state_enabled`, `state_focused`, `state_checked`, `state_selected`, `state_window_focused`, `state_checkable`
 - Item par défaut (sans état)
 - Algorithme de matching suivant la logique Android
+- **Items inline (ADR 0116 — L4)** : drawable embarqué dans le `<item>`
+  (`<shape>`, `<vector>`, `<color>`, `<selector>` imbriqué…), capturé par
+  re-sérialisation et résolu via le dispatch récursif ; la référence
+  `android:drawable` garde la priorité (contrat P0)
 
 ### ✅ Vector (VectorDrawable)
 - Dimensions (width, height) et viewport
@@ -112,7 +116,8 @@ Object config = resolver.parseConfig(xml);  // ShapeConfig, SelectorConfig, Vect
 | Type | Fichier | Nombre de cas |
 |------|---------|---------------|
 | JVM | `ShapeParserTest` | 17 |
-| JVM | `SelectorParserTest` | 12 |
+| JVM | `SelectorParserTest` (dont 8 items inline L4) | 20 |
+| JVM | `SelectorInlineCreationTest` (L4) | 8 |
 | JVM | `VectorParserTest` | 9 |
 | JVM | `DrawableResolverImplTest` + `DrawableResolverCreationTest` | 15 |
 | JVM | `LayerListParserTest` (P0) | 15 |
@@ -125,7 +130,7 @@ Object config = resolver.parseConfig(xml);  // ShapeConfig, SelectorConfig, Vect
 | JVM | `AnimatedVectorParserTest` (P5) | 14 |
 | JVM | `AnimatedVectorCreationTest` (P5) | 11 |
 | Instrumenté | `DrawableResolverImplInstrumentedTest` | 10 |
-| **Total** | | **180 JVM + 10 instrumentés** |
+| **Total** | | **196 JVM + 10 instrumentés** |
 
 ## Architecture
 

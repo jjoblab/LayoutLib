@@ -73,8 +73,15 @@ public class SelectorParser {
 
     /**
      * Parse un élément {@code <item>}.
+     *
+     * <p>L'item désigne son drawable soit par référence
+     * {@code android:drawable="@…"} (prioritaire à la résolution — contrat
+     * P0/P4/P5), soit par un enfant XML inline capturé tel quel
+     * ({@code <shape>}, {@code <vector>}, {@code <color>}, {@code <selector>}
+     * imbriqué… — ADR 0116 — L4).</p>
      */
-    private SelectorConfig.SelectorItem parseItem(XmlPullParser parser) {
+    private SelectorConfig.SelectorItem parseItem(XmlPullParser parser)
+            throws XmlPullParserException, IOException {
         SelectorConfig.SelectorItem item = new SelectorConfig.SelectorItem();
         item.setDrawableRef(getAttribute(parser, "android", "drawable"));
         item.setStatePressed(parseBooleanAttr(getAttribute(parser, "android", "state_pressed")));
@@ -86,6 +93,17 @@ public class SelectorParser {
                 parseBooleanAttr(getAttribute(parser, "android", "state_window_focused")));
         item.setStateCheckable(
                 parseBooleanAttr(getAttribute(parser, "android", "state_checkable")));
+
+        // Enfant inline éventuel : sauter le texte blanc puis capturer le
+        // sous-arbre (le parser ressort sur l'END_TAG de l'inline)
+        int event = parser.next();
+        while (event == XmlPullParser.TEXT && parser.getText() != null
+                && parser.getText().trim().isEmpty()) {
+            event = parser.next();
+        }
+        if (event == XmlPullParser.START_TAG) {
+            item.setInlineDrawableXml(DrawableXmlFragments.captureElement(parser));
+        }
         return item;
     }
 

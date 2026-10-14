@@ -142,6 +142,129 @@ class SelectorParserTest {
     }
 
     @Nested
+    @DisplayName("Items inline (ADR 0116 — L4)")
+    class InlineItems {
+
+        @Test
+        @DisplayName("capture un <shape> inline dans un <item>")
+        void capturesInlineShape() {
+            SelectorConfig config = parser.parse(
+                    "<selector xmlns:android=\"http://schemas.android.com/apk/res/android\">"
+                            + "<item android:state_pressed=\"true\">"
+                            + "<shape android:shape=\"oval\">"
+                            + "<solid android:color=\"#FF6750A4\"/>"
+                            + "</shape>"
+                            + "</item>"
+                            + "</selector>");
+            SelectorConfig.SelectorItem item = config.getItems().get(0);
+            assertThat(item.hasInlineDrawable()).isTrue();
+            assertThat(item.getInlineDrawableXml())
+                    .startsWith("<shape")
+                    .contains("oval")
+                    .contains("#FF6750A4")
+                    .endsWith("</shape>");
+        }
+
+        @Test
+        @DisplayName("capture un <color> inline (fragment minimal)")
+        void capturesInlineColor() {
+            SelectorConfig config = parser.parse(
+                    "<selector xmlns:android=\"http://schemas.android.com/apk/res/android\">"
+                            + "<item><color android:color=\"#FFFF0000\"/></item>"
+                            + "</selector>");
+            SelectorConfig.SelectorItem item = config.getItems().get(0);
+            assertThat(item.getInlineDrawableXml())
+                    .startsWith("<color")
+                    .contains("#FFFF0000")
+                    .endsWith("</color>");
+        }
+
+        @Test
+        @DisplayName("référence et inline coexistent sur un même item (réf prioritaire)")
+        void referenceAndInlineCoexist() {
+            SelectorConfig config = parser.parse(
+                    "<selector xmlns:android=\"http://schemas.android.com/apk/res/android\">"
+                            + "<item android:drawable=\"@drawable/officiel\">"
+                            + "<shape android:shape=\"rectangle\"/>"
+                            + "</item>"
+                            + "</selector>");
+            SelectorConfig.SelectorItem item = config.getItems().get(0);
+            assertThat(item.getDrawableRef()).isEqualTo("@drawable/officiel");
+            assertThat(item.hasInlineDrawable()).isTrue();
+        }
+
+        @Test
+        @DisplayName("un item self-closing n'a pas d'inline")
+        void selfClosingItemHasNoInline() {
+            SelectorConfig config = parser.parse(
+                    "<selector xmlns:android=\"http://schemas.android.com/apk/res/android\">"
+                            + "<item android:drawable=\"@drawable/a\"/>"
+                            + "</selector>");
+            assertThat(config.getItems().get(0).hasInlineDrawable()).isFalse();
+            assertThat(config.getItems().get(0).getInlineDrawableXml()).isNull();
+        }
+
+        @Test
+        @DisplayName("les états restent parsés sur un item inline")
+        void statesStillParsedOnInlineItem() {
+            SelectorConfig config = parser.parse(
+                    "<selector xmlns:android=\"http://schemas.android.com/apk/res/android\">"
+                            + "<item android:state_pressed=\"true\" android:state_enabled=\"false\">"
+                            + "<color android:color=\"#FF0000\"/>"
+                            + "</item>"
+                            + "</selector>");
+            SelectorConfig.SelectorItem item = config.getItems().get(0);
+            assertThat(item.getStatePressed()).isTrue();
+            assertThat(item.getStateEnabled()).isFalse();
+            assertThat(item.hasInlineDrawable()).isTrue();
+        }
+
+        @Test
+        @DisplayName("les items suivants un item inline sont encore parsés")
+        void itemsAfterInlineStillParsed() {
+            SelectorConfig config = parser.parse(
+                    "<selector xmlns:android=\"http://schemas.android.com/apk/res/android\">"
+                            + "<item android:state_pressed=\"true\">"
+                            + "<shape android:shape=\"oval\"/>"
+                            + "</item>"
+                            + "<item android:drawable=\"@drawable/repos\"/>"
+                            + "</selector>");
+            assertThat(config.getItemCount()).isEqualTo(2);
+            assertThat(config.getItems().get(1).getDrawableRef())
+                    .isEqualTo("@drawable/repos");
+            assertThat(config.getItems().get(1).hasInlineDrawable()).isFalse();
+        }
+
+        @Test
+        @DisplayName("un <selector> imbriqué inline est capturé (récursion)")
+        void capturesNestedSelector() {
+            SelectorConfig config = parser.parse(
+                    "<selector xmlns:android=\"http://schemas.android.com/apk/res/android\">"
+                            + "<item>"
+                            + "<selector>"
+                            + "<item android:drawable=\"@drawable/interne\"/>"
+                            + "</selector>"
+                            + "</item>"
+                            + "</selector>");
+            SelectorConfig.SelectorItem item = config.getItems().get(0);
+            assertThat(item.getInlineDrawableXml())
+                    .startsWith("<selector")
+                    .contains("@drawable/interne")
+                    .endsWith("</selector>");
+        }
+
+        @Test
+        @DisplayName("un item avec du texte (non-blanc) ne capture rien")
+        void textOnlyItemCapturesNothing() {
+            SelectorConfig config = parser.parse(
+                    "<selector xmlns:android=\"http://schemas.android.com/apk/res/android\">"
+                            + "<item>texte résiduel</item>"
+                            + "</selector>");
+            assertThat(config.getItems().get(0).hasInlineDrawable()).isFalse();
+        }
+    }
+
+    @Nested
     @DisplayName("Cas d'erreur")
     class ErrorCases {
 
