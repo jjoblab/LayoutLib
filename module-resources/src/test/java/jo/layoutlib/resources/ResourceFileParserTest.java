@@ -20,6 +20,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("ResourceFileParser — parsing des XML de resources")
 class ResourceFileParserTest {
 
+    /** Namespace XLIFF standard d'Android pour les tests <xliff:g> (v3.3). */
+    private static final String XLIFF_NS =
+            " xmlns:xliff=\"urn:oasis:names:tc:xliff:document:1.2\"";
+
     private ResourceTable table;
     private ResourceFileParser parser;
 
@@ -236,6 +240,190 @@ class ResourceFileParserTest {
             assertThatThrownBy(() ->
                     parser.parse("<resources><integer name=\"x\">abc</integer></resources>"))
                     .isInstanceOf(ResourceException.class);
+        }
+    }
+
+    @Nested
+    @DisplayName("Parsing des segments <xliff:g>")
+    class XliffParsing {
+
+        @Test
+        @DisplayName("capture id/example, le texte brut garde le placeholder")
+        void shouldCaptureXliffAttributes() {
+            parser.parse("<resources" + XLIFF_NS + ">"
+                    + "<string name=\"songs\">%1$d chansons — "
+                    + "<xliff:g id=\"artist\" example=\"Adèle\">%2$s</xliff:g>"
+                    + "</string></resources>");
+            assertThat(table.getString("songs", ResourceQualifier.DEFAULT))
+                    .isEqualTo("%1$d chansons — %2$s");
+            java.util.List<XliffSpan> spans =
+                    table.getStringXliffSpans("songs", ResourceQualifier.DEFAULT);
+            assertThat(spans).hasSize(1);
+            assertThat(spans.get(0).getId()).isEqualTo("artist");
+            assertThat(spans.get(0).getExample()).isEqualTo("Adèle");
+            assertThat(spans.get(0).getPlaceholder()).isEqualTo("%2$s");
+        }
+
+        @Test
+        @DisplayName("plusieurs segments capturés dans l'ordre")
+        void shouldCaptureSeveralSpansInOrder() {
+            parser.parse("<resources" + XLIFF_NS + ">"
+                    + "<string name=\"full\">"
+                    + "<xliff:g id=\"count\" example=\"7\">%1$d</xliff:g> chansons de "
+                    + "<xliff:g id=\"artist\" example=\"Adèle\">%2$s</xliff:g>"
+                    + "</string></resources>");
+            java.util.List<XliffSpan> spans =
+                    table.getStringXliffSpans("full", ResourceQualifier.DEFAULT);
+            assertThat(spans).hasSize(2);
+            assertThat(spans.get(0).getId()).isEqualTo("count");
+            assertThat(spans.get(1).getId()).isEqualTo("artist");
+        }
+
+        @Test
+        @DisplayName("segment sans example → span capturé, attribut null")
+        void shouldCaptureSpanWithoutExample() {
+            parser.parse("<resources" + XLIFF_NS + ">"
+                    + "<string name=\"count_only\">"
+                    + "<xliff:g id=\"count\">%1$d</xliff:g> items"
+                    + "</string></resources>");
+            java.util.List<XliffSpan> spans =
+                    table.getStringXliffSpans("count_only", ResourceQualifier.DEFAULT);
+            assertThat(spans).hasSize(1);
+            assertThat(spans.get(0).getExample()).isNull();
+            assertThat(spans.get(0).hasExample()).isFalse();
+        }
+
+        @Test
+        @DisplayName("préfixe non déclaré → XML invalide rejeté (comme aapt2)")
+        void shouldRejectUndeclaredPrefix() {
+            // aapt2 exige la déclaration xmlns:xliff ; un préfixe non lié
+            // est un XML invalide — rejeté comme tout XML malformé.
+            assertThatThrownBy(() -> parser.parse("<resources>"
+                    + "<string name=\"songs\">%1$d chansons de "
+                    + "<xliff:g id=\"artist\" example=\"Adèle\">%2$s</xliff:g>"
+                    + "</string></resources>"))
+                    .isInstanceOf(ResourceException.class);
+        }
+
+        @Test
+        @DisplayName("chaîne sans xliff → aucune entrée dans la table des spans")
+        void shouldNotStoreSpansForPlainString() {
+            parser.parse("<resources" + XLIFF_NS + ">"
+                    + "<string name=\"plain\">Hello</string></resources>");
+            assertThat(table.hasStringXliffSpans("plain")).isFalse();
+            assertThat(table.stringXliffCount()).isEqualTo(0);
+        }
+
+        @Test
+        @DisplayName("balise inline non-xliff traversée sans capture")
+        void shouldTraverseNonXliffInlineTags() {
+            parser.parse("<resources" + XLIFF_NS + ">"
+                    + "<string name=\"rich\"><b>Gras</b> et %d</string></resources>");
+            assertThat(table.getString("rich", ResourceQualifier.DEFAULT))
+                    .isEqualTo("Gras et %d");
+            assertThat(table.hasStringXliffSpans("rich")).isFalse();
+        }
+
+        @Test
+        @DisplayName("spans des items de <plurals> capturés par catégorie")
+        void shouldCapturePluralsSpansByCategory() {
+            parser.parse("<resources" + XLIFF_NS + ">"
+                    + "<plurals name=\"items\">"
+                    + "<item quantity=\"one\">"
+                    + "<xliff:g id=\"count\" example=\"1\">%d</xliff:g> item"
+                    + "</item>"
+                    + "<item quantity=\"other\">"
+                    + "<xliff:g id=\"count\" example=\"7\">%d</xliff:g> items"
+                    + "</item>"
+                    + "</plurals></resources>");
+            assertThat(table.getPlurals("items", ResourceQualifier.DEFAULT))
+                    .containsEntry("one", "%d item")
+                    .containsEntry("other", "%d items");
+            java.util.Map<String, java.util.List<XliffSpan>> byCategory =
+                    table.getPluralsXliffSpans("items", ResourceQualifier.DEFAULT);
+            assertThat(byCategory).containsKeys("one", "other");
+            assertThat(byCategory.get("one").get(0).getExample()).isEqualTo("1");
+            assertThat(byCategory.get("other").get(0).getExample()).isEqualTo("7");
+        }
+
+        @Test
+        @DisplayName("plurals mixte : seul l'item avec xliff porte des spans")
+        void shouldStoreSpansOnlyForRichItems() {
+            parser.parse("<resources" + XLIFF_NS + ">"
+                    + "<plurals name=\"mix\">"
+                    + "<item quantity=\"one\">seul</item>"
+                    + "<item quantity=\"other\">"
+                    + "<xliff:g id=\"count\" example=\"7\">%d</xliff:g> items"
+                    + "</item>"
+                    + "</plurals></resources>");
+            java.util.Map<String, java.util.List<XliffSpan>> byCategory =
+                    table.getPluralsXliffSpans("mix", ResourceQualifier.DEFAULT);
+            assertThat(byCategory).containsOnlyKeys("other");
+        }
+    }
+
+    @Nested
+    @DisplayName("Parsing de <integer-array>")
+    class IntegerArrayParsing {
+
+        @Test
+        @DisplayName("parse les items en entiers")
+        void shouldParseIntegerArrayItems() {
+            parser.parse("<resources><integer-array name=\"ratios\">"
+                    + "<item>2</item><item>3</item><item>5</item>"
+                    + "</integer-array></resources>");
+            assertThat(table.getIntegerArray("ratios", ResourceQualifier.DEFAULT))
+                    .containsExactly(2, 3, 5);
+        }
+
+        @Test
+        @DisplayName("items malformés ou vides neutralisés en 0 (longueur préservée)")
+        void shouldNeutralizeMalformedItems() {
+            parser.parse("<resources><integer-array name=\"poison\">"
+                    + "<item>1</item><item>abc</item><item></item><item>-7</item>"
+                    + "</integer-array></resources>");
+            assertThat(table.getIntegerArray("poison", ResourceQualifier.DEFAULT))
+                    .containsExactly(1, 0, 0, -7);
+        }
+
+        @Test
+        @DisplayName("espaces autour des valeurs tolérés")
+        void shouldTrimItemValues() {
+            parser.parse("<resources><integer-array name=\"spaced\">"
+                    + "<item>  16  </item><item>\n24\n</item>"
+                    + "</integer-array></resources>");
+            assertThat(table.getIntegerArray("spaced", ResourceQualifier.DEFAULT))
+                    .containsExactly(16, 24);
+        }
+
+        @Test
+        @DisplayName("array vide → liste vide")
+        void shouldReturnEmptyArray() {
+            parser.parse("<resources><integer-array name=\"empty\">"
+                    + "</integer-array></resources>");
+            assertThat(table.getIntegerArray("empty", ResourceQualifier.DEFAULT)).isEmpty();
+        }
+
+        @Test
+        @DisplayName("integer-array et string-array sont indépendants")
+        void shouldKeepArrayTypesSeparate() {
+            parser.parse("<resources>"
+                    + "<integer-array name=\"nums\"><item>1</item></integer-array>"
+                    + "<string-array name=\"labels\"><item>un</item></string-array>"
+                    + "</resources>");
+            assertThat(table.integerArrayCount()).isEqualTo(1);
+            assertThat(table.stringArrayCount()).isEqualTo(1);
+            assertThat(table.hasIntegerArray("labels")).isFalse();
+            assertThat(table.hasStringArray("nums")).isFalse();
+        }
+
+        @Test
+        @DisplayName("compte comme un élément parsé")
+        void shouldCountAsParsedElement() {
+            int count = parser.parse("<resources>"
+                    + "<integer-array name=\"nums\"><item>1</item><item>2</item></integer-array>"
+                    + "</resources>");
+            assertThat(count).isEqualTo(1);
         }
     }
 

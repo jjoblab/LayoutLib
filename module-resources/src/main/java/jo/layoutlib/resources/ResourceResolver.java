@@ -12,7 +12,8 @@ package jo.layoutlib.resources;
  *   <li>{@code @dimen/foo} → valeur flottante en pixels</li>
  *   <li>{@code @integer/foo} → valeur entière</li>
  *   <li>{@code @bool/foo} → booléen</li>
- *   <li>{@code @array/foo} → liste de chaînes ({@code <string-array>})</li>
+ *   <li>{@code @array/foo} → liste de chaînes ({@code <string-array>}) ou
+ *       liste d'entiers ({@code <integer-array>}, v3.3)</li>
  *   <li>{@code @plurals/foo} → chaîne de pluriel sélectionnée par les règles
  *       CLDR de la locale courante ({@code <plurals>})</li>
  *   <li>{@code @layout/foo} → contenu XML du layout</li>
@@ -86,6 +87,67 @@ public interface ResourceResolver {
      *         introuvable
      */
     java.util.List<String> getStringArray(String reference);
+
+    /**
+     * Résout une référence d'integer-array {@code @array/foo} (v3.3).
+     *
+     * <p>Séparé de {@link #getStringArray(String)} : l'espace de noms
+     * {@code @array/} porte les deux types ({@code <string-array>} et
+     * {@code <integer-array>}) ; côté device, {@code Resources.getIntArray()}
+     * ne voit que les arrays typés entiers — ici, une référence qui désigne
+     * un {@code <string-array>} retourne {@code null} (jamais d'exception).
+     * Les items sont des littéraux entiers ; un item malformé (ou une
+     * référence {@code @integer/} — non supportée dans les items) est
+     * neutralisé en {@code 0}, la longueur de l'array est préservée.</p>
+     *
+     * @param reference la référence (ex. {@code @array/ratios} — le nom nu
+     *                  est aussi accepté)
+     * @return une nouvelle liste des entiers résolus, ou {@code null} si
+     *         introuvable
+     * @since 3.3
+     */
+    java.util.List<Integer> getIntegerArray(String reference);
+
+    /**
+     * Résout une référence de chaîne en version preview lisible (v3.3).
+     *
+     * <p>Même résolution que {@link #getString(String)} (chainage des
+     * {@code @string/}, repli de qualifier), puis substitution des exemples
+     * XLIFF : chaque segment {@code <xliff:g>} portant un
+     * {@code example="…"} voit son placeholder remplacé par cette valeur —
+     * comme le layout editor d'Android Studio, « 7 chansons — Adèle » au
+     * lieu de « %1$d chansons — %2$s ». Les placeholders sans exemple
+     * restent visibles : on ne substitue que ce que l'auteur de la resource
+     * a explicitement documenté.</p>
+     *
+     * <p>Le rendu device-fidèle reste {@link #getString(String)} — cette
+     * variante est offerte à l'éditeur pour ses modes « aperçu lisible ».</p>
+     *
+     * @param reference la référence (ex. {@code @string/songs})
+     * @return la chaîne avec exemples substitués, ou {@code null} si
+     *         introuvable
+     * @since 3.3
+     */
+    String getPreviewString(String reference);
+
+    /**
+     * Résout un pluriel en version preview lisible (v3.3).
+     *
+     * <p>Même sélection CLDR que
+     * {@link #getQuantityString(String, int, Object...)} (catégorie par
+     * langue courante et quantité, repli {@code other}), puis substitution
+     * des exemples XLIFF portés par l'item sélectionné —
+     * {@code <item quantity="other"><xliff:g id="count" example="7">%d
+     * </xliff:g> chansons</item>} donne « 7 chansons ».</p>
+     *
+     * @param reference la référence (ex. {@code @plurals/songs} — le nom nu
+     *                  est aussi accepté)
+     * @param quantity  la quantité pilotant la catégorie CLDR
+     * @return la chaîne avec exemples substitués, ou {@code null} si le
+     *         plurals est introuvable ou sans item applicable
+     * @since 3.3
+     */
+    String getPreviewQuantityString(String reference, int quantity);
 
     /**
      * Résout une référence de pluriel {@code @plurals/foo} pour une quantité

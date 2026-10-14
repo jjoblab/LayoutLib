@@ -58,6 +58,19 @@ public class ResourceTable {
     private final Map<String, Map<ResourceQualifier, Map<String, String>>> pluralsTable =
             new HashMap<>();
 
+    /** Table des integer-arrays, indexée par nom puis qualifier (v3.3). */
+    private final Map<String, Map<ResourceQualifier, List<Integer>>> integerArrayTable =
+            new HashMap<>();
+
+    /** Segments {@code <xliff:g>} des chaînes, par nom puis qualifier (v3.3). */
+    private final Map<String, Map<ResourceQualifier, List<XliffSpan>>> stringXliffTable =
+            new HashMap<>();
+
+    /** Segments {@code <xliff:g>} des pluriels, par nom, qualifier puis
+     * catégorie (v3.3). */
+    private final Map<String, Map<ResourceQualifier, Map<String, List<XliffSpan>>>>
+            pluralsXliffTable = new HashMap<>();
+
     /**
      * Ajoute un pluriel ({@code <plurals>}) dans la table.
      *
@@ -77,6 +90,70 @@ public class ResourceTable {
                 ? new LinkedHashMap<>(quantityToText)
                 : new LinkedHashMap<>();
         pluralsTable.computeIfAbsent(name, k -> new HashMap<>()).put(qualifier, items);
+    }
+
+    /**
+     * Ajoute un integer-array ({@code <integer-array>}) dans la table (v3.3).
+     *
+     * @param name      nom de l'array (référencé par {@code @array/name})
+     * @param values    les éléments de l'array
+     * @param qualifier qualifier du dossier source
+     * @since 3.3
+     */
+    public void putIntegerArray(String name, List<Integer> values,
+                                ResourceQualifier qualifier) {
+        integerArrayTable.computeIfAbsent(name, k -> new HashMap<>())
+                .put(qualifier, values != null ? new java.util.ArrayList<>(values)
+                        : new java.util.ArrayList<>());
+    }
+
+    /**
+     * Ajoute les segments {@code <xliff:g>} d'une chaîne (v3.3).
+     *
+     * <p>Le texte brut de la chaîne est stocké par
+     * {@link #putString(String, String, ResourceQualifier)} ; cette entrée
+     * capture les attributs {@code id}/{@code example} perdus autrement.</p>
+     *
+     * @param name      nom de la chaîne
+     * @param spans     les segments capturés
+     * @param qualifier qualifier du dossier source
+     * @since 3.3
+     */
+    public void putStringXliffSpans(String name, List<XliffSpan> spans,
+                                    ResourceQualifier qualifier) {
+        putStringXliffSpansInternal(name, spans, qualifier);
+    }
+
+    /**
+     * Ajoute les segments {@code <xliff:g>} des items d'un pluriel (v3.3).
+     *
+     * @param name             nom du pluriel
+     * @param categoryToSpans  les segments par catégorie CLDR
+     * @param qualifier        qualifier du dossier source
+     * @since 3.3
+     */
+    public void putPluralsXliffSpans(String name, Map<String, List<XliffSpan>> categoryToSpans,
+                                     ResourceQualifier qualifier) {
+        Map<String, List<XliffSpan>> copy = new LinkedHashMap<>();
+        if (categoryToSpans != null) {
+            for (Map.Entry<String, List<XliffSpan>> entry : categoryToSpans.entrySet()) {
+                copy.put(entry.getKey(),
+                        new java.util.ArrayList<>(entry.getValue() != null
+                                ? entry.getValue() : java.util.Collections.emptyList()));
+            }
+        }
+        pluralsXliffTable.computeIfAbsent(name, k -> new HashMap<>()).put(qualifier, copy);
+    }
+
+    /**
+     * Enregistre les spans d'une chaîne (copie défensive).
+     */
+    private void putStringXliffSpansInternal(String name, List<XliffSpan> spans,
+                                             ResourceQualifier qualifier) {
+        stringXliffTable.computeIfAbsent(name, k -> new HashMap<>())
+                .put(qualifier, spans != null
+                        ? new java.util.ArrayList<>(spans)
+                        : new java.util.ArrayList<>());
     }
 
     /**
@@ -229,6 +306,57 @@ public class ResourceTable {
     }
 
     /**
+     * Récupère un integer-array pour le qualifier cible (v3.3).
+     *
+     * @param name   nom de l'array
+     * @param target qualifier cible
+     * @return une copie de la liste des entiers, ou {@code null} si absente
+     * @since 3.3
+     */
+    public List<Integer> getIntegerArray(String name, ResourceQualifier target) {
+        List<Integer> values = resolveBest(integerArrayTable.get(name), target);
+        return values != null ? new java.util.ArrayList<>(values) : null;
+    }
+
+    /**
+     * Récupère les segments {@code <xliff:g>} d'une chaîne pour le
+     * qualifier cible (v3.3).
+     *
+     * @param name   nom de la chaîne
+     * @param target qualifier cible
+     * @return une copie de la liste des segments, ou {@code null} si absente
+     * @since 3.3
+     */
+    public List<XliffSpan> getStringXliffSpans(String name, ResourceQualifier target) {
+        List<XliffSpan> spans = resolveBest(stringXliffTable.get(name), target);
+        return spans != null ? new java.util.ArrayList<>(spans) : null;
+    }
+
+    /**
+     * Récupère les segments {@code <xliff:g>} des items d'un pluriel pour
+     * le qualifier cible (v3.3).
+     *
+     * @param name   nom du pluriel
+     * @param target qualifier cible
+     * @return une copie profonde de la map catégorie → segments, ou
+     *         {@code null} si absente
+     * @since 3.3
+     */
+    public Map<String, List<XliffSpan>> getPluralsXliffSpans(String name,
+                                                             ResourceQualifier target) {
+        Map<String, List<XliffSpan>> byCategory =
+                resolveBest(pluralsXliffTable.get(name), target);
+        if (byCategory == null) {
+            return null;
+        }
+        Map<String, List<XliffSpan>> copy = new LinkedHashMap<>();
+        for (Map.Entry<String, List<XliffSpan>> entry : byCategory.entrySet()) {
+            copy.put(entry.getKey(), new java.util.ArrayList<>(entry.getValue()));
+        }
+        return copy;
+    }
+
+    /**
      * Indique si un string-array existe dans la table.
      *
      * @param name nom de l'array
@@ -258,10 +386,67 @@ public class ResourceTable {
     }
 
     /**
+     * Indique si un integer-array existe dans la table (v3.3).
+     *
+     * @param name nom de l'array
+     * @return {@code true} si l'array existe
+     * @since 3.3
+     */
+    public boolean hasIntegerArray(String name) {
+        return integerArrayTable.containsKey(name);
+    }
+
+    /**
+     * Indique si une chaîne porte des segments {@code <xliff:g>} (v3.3).
+     *
+     * @param name nom de la chaîne
+     * @return {@code true} si des segments sont stockés
+     * @since 3.3
+     */
+    public boolean hasStringXliffSpans(String name) {
+        return stringXliffTable.containsKey(name);
+    }
+
+    /**
+     * Indique si un pluriel porte des segments {@code <xliff:g>} (v3.3).
+     *
+     * @param name nom du pluriel
+     * @return {@code true} si des segments sont stockés
+     * @since 3.3
+     */
+    public boolean hasPluralsXliffSpans(String name) {
+        return pluralsXliffTable.containsKey(name);
+    }
+
+    /**
      * @return le nombre total de string-arrays stockés
      */
     public int stringArrayCount() {
         return stringArrayTable.size();
+    }
+
+    /**
+     * @return le nombre total d'integer-arrays stockés
+     * @since 3.3
+     */
+    public int integerArrayCount() {
+        return integerArrayTable.size();
+    }
+
+    /**
+     * @return le nombre total de chaînes portant des segments xliff
+     * @since 3.3
+     */
+    public int stringXliffCount() {
+        return stringXliffTable.size();
+    }
+
+    /**
+     * @return le nombre total de pluriels portant des segments xliff
+     * @since 3.3
+     */
+    public int pluralsXliffCount() {
+        return pluralsXliffTable.size();
     }
 
     /**
@@ -369,5 +554,8 @@ public class ResourceTable {
         boolTable.clear();
         stringArrayTable.clear();
         pluralsTable.clear();
+        integerArrayTable.clear();
+        stringXliffTable.clear();
+        pluralsXliffTable.clear();
     }
 }
