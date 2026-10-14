@@ -121,8 +121,12 @@ class BridgeInflaterFactory2Test {
         }
 
         @Test
-        @DisplayName("la factory reçoit le contexte de l'inflater et un AttributeSet null")
-        void factoryReceivesContextAndNullAttrs() {
+        @DisplayName("la factory reçoit le contexte de l'inflater et un AttributeSet non-null (v3.4.1)")
+        void factoryReceivesContextAndNopAttrs() {
+            // v3.4.1 — G1 : BridgeInflater passe maintenant un NopAttributeSet
+            // (non-null) au lieu de null — l'interface AOSP Factory2 déclare
+            // attrs comme non-null. Les attributs réels sont appliqués APRÈS
+            // par AttributeApplier (pattern LayoutLib).
             List<Object> received = new ArrayList<>();
             LayoutInflater.Factory2 factory = new LayoutInflater.Factory2() {
                 @Override
@@ -146,7 +150,8 @@ class BridgeInflaterFactory2Test {
                             + " android:layout_height=\"wrap_content\"/>");
 
             assertThat(received.get(0)).isSameAs(context);
-            assertThat(received.get(1)).isNull();
+            // v3.4.1 : attrs est maintenant un NopAttributeSet (non-null).
+            assertThat(received.get(1)).isNotNull();
         }
     }
 

@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import jo.layoutlib.inflater.bridge.MockView;
+import jo.layoutlib.inflater.bridge.android.NopAttributeSet;
 import jo.layoutlib.resources.ResourceResolver;
 
 /**
@@ -549,7 +550,13 @@ public class BridgeInflater {
         }
         View view;
         try {
-            view = factory2.onCreateView(parent, tag, context, null);
+            // v3.4.1 — G1 : passer un AttributeSet non-null au lieu de null.
+            // L'interface AOSP Factory2 déclare attrs comme non-null — passer
+            // null provoque une NPE côté Kotlin (paramètre non-nullable).
+            // On utilise un NopAttributeSet (vide) — les attributs réels sont
+            // appliqués APRÈS par AttributeApplier (pattern LayoutLib).
+            AttributeSet attrs = new NopAttributeSet();
+            view = factory2.onCreateView(parent, tag, context, attrs);
         } catch (RuntimeException e) {
             throw new InflateException(
                     "La Factory2 a échoué pour <" + tag + "> : " + e.getMessage(), e);
