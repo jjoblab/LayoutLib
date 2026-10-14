@@ -75,11 +75,14 @@ class XmlPreprocessorTest {
         }
 
         @Test
-        @DisplayName("ne convertit pas les attributs tools non listés (tools:context par exemple)")
-        void shouldNotConvertUnknownToolsAttrs() {
+        @DisplayName("strippe les attributs tools non listés (tools:context par exemple) — v3.4.5")
+        void shouldStripUnknownToolsAttrs() {
+            // v3.4.5 — les attributs tools:* non convertis sont STRIPPÉS
+            // (pas laissés tels quels). Sans ça, le parseur XML lève
+            // "Undefined Prefix: tools" car xmlns:tools est supprimé.
             String xml = "<LinearLayout tools:context=\".MainActivity\"/>";
             String result = XmlPreprocessor.preprocess(xml);
-            assertThat(result).contains("tools:context");
+            assertThat(result).doesNotContain("tools:context");
         }
     }
 

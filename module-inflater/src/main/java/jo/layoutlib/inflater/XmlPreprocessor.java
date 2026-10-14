@@ -45,6 +45,10 @@ public final class XmlPreprocessor {
     private static final Pattern TOOLS_ATTR_PATTERN =
             Pattern.compile("tools:(text|textColor|visibility|layout_width|layout_height|src|background)\\s*=\\s*\"([^\"]*)\"");
 
+    /** Pattern pour identifier les attributs tools:* restants (à stripper). */
+    private static final Pattern TOOLS_ATTR_STRIP_PATTERN =
+            Pattern.compile("\\s+tools:[a-zA-Z_]+\\s*=\\s*\"[^\"]*\"");
+
     /** Pattern pour identifier la déclaration xmlns:tools. */
     private static final Pattern XMLNS_TOOLS_PATTERN =
             Pattern.compile("\\s+xmlns:tools=\"http://schemas\\.android\\.com/tools\"");
@@ -87,6 +91,11 @@ public final class XmlPreprocessor {
         String result = xmlSource;
         result = stripXmlnsTools(result);
         result = convertToolsAttributes(result);
+        // v3.4.5 — stripper les attributs tools:* restants (context, listitem,
+        // itemCount, showIn, etc.) qui ne sont pas convertis. Sans ça, le
+        // parseur XML lève "Undefined Prefix: tools" car xmlns:tools est
+        // déjà supprimé.
+        result = stripRemainingToolsAttributes(result);
         result = convertMarginStart(result);
         result = convertMarginEnd(result);
         result = convertPaddingStart(result);
@@ -113,6 +122,22 @@ public final class XmlPreprocessor {
     private static String convertToolsAttributes(String xml) {
         Matcher matcher = TOOLS_ATTR_PATTERN.matcher(xml);
         return matcher.replaceAll("android:$1=\"$2\"");
+    }
+
+    /**
+     * v3.4.5 — Supprime les attributs {@code tools:*} restants qui n'ont pas
+     * été convertis (ex: {@code tools:context}, {@code tools:listitem},
+     * {@code tools:itemCount}, {@code tools:showIn}).
+     *
+     * <p>Sans cette étape, le parseur XML lève {@code Undefined Prefix: tools}
+     * car la déclaration {@code xmlns:tools} a déjà été supprimée par
+     * {@link #stripXmlnsTools(String)}.</p>
+     *
+     * @param xml le XML source (sans xmlns:tools, après conversion)
+     * @return le XML sans aucun attribut tools:*
+     */
+    private static String stripRemainingToolsAttributes(String xml) {
+        return TOOLS_ATTR_STRIP_PATTERN.matcher(xml).replaceAll("");
     }
 
     /**
