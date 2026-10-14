@@ -74,6 +74,23 @@ public interface ThemeResolver {
     String getParentStyle(String styleName);
 
     /**
+     * Récupère la valeur d'un attribut défini dans un style — marche la
+     * chaîne d'héritage (parent explicite + parent implicite point-notation).
+     *
+     * <p>v3.4.2 — G6 : permet à {@code AttributeApplier.applyStyle} de
+     * résoudre {@code style="@style/Widget.App.Button"} SANS dépendre de
+     * {@code Resources.getIdentifier} (qui retourne 0 pour les styles du
+     * projet car le contexte IDE n'a pas le R.style projet).</p>
+     *
+     * @param styleName nom du style (sans le préfixe {@code @style/})
+     * @param attrName nom de l'attribut (ex. {@code background}, {@code textColor})
+     * @return la valeur résolue (couleur hex, dimension, référence, etc.),
+     *         ou {@code null} si ni le style ni ses parents ne définissent
+     *         l'attribut
+     */
+    String getStyleAttribute(String styleName, String attrName);
+
+    /**
      * Vide le cache des résolutions.
      */
     void clearCache();

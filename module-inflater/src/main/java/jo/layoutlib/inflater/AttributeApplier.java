@@ -780,15 +780,25 @@ public final class AttributeApplier {
         if (styleRef == null || styleRef.isEmpty()) return;
 
         int styleId = 0;
+        String styleName = null;
         if (styleRef.startsWith("@style/")) {
-            String name = styleRef.substring("@style/".length());
-            styleId = context.getResources().getIdentifier(name, "style", context.getPackageName());
+            styleName = styleRef.substring("@style/".length());
+            styleId = context.getResources().getIdentifier(styleName, "style", context.getPackageName());
             if (styleId == 0) {
-                styleId = context.getResources().getIdentifier(name, "style", "android");
+                styleId = context.getResources().getIdentifier(styleName, "style", "android");
             }
         } else if (styleRef.startsWith("@android:style/")) {
-            String name = styleRef.substring("@android:style/".length());
-            styleId = context.getResources().getIdentifier(name, "style", "android");
+            styleName = styleRef.substring("@android:style/".length());
+            styleId = context.getResources().getIdentifier(styleName, "style", "android");
+        }
+
+        // v3.4.2 — G6 : si le style n'est pas trouvé dans le R de l'IDE
+        // (styleId == 0), on délègue au ThemeResolver qui parse styles.xml
+        // du projet. Cela permet à `style="@style/Widget.App.Button"` de
+        // marcher SANS que le style soit compilé dans le R de l'IDE.
+        if (styleId == 0 && themeResolver != null && styleName != null) {
+            appliquerStyleViaThemeResolver(view, styleName);
+            return;
         }
 
         if (styleId == 0) return;
@@ -984,6 +994,123 @@ public final class AttributeApplier {
         Debug.logWarning("attributes",
                 "Attribut '" + attr + "' ignoré : " + e.getClass().getSimpleName()
                         + (e.getMessage() != null ? " (" + e.getMessage() + ")" : ""));
+    }
+
+    /**
+     * v3.4.2 — G6 : Applique un style via le ThemeResolver (fallback quand
+     * le style n'est pas dans le R de l'IDE).
+     *
+     * <p>Marche la liste des attributs communs (background, padding,
+     * visibility, enabled, clickable, focusable, minWidth, minHeight,
+     * elevation, textColor, textSize, text) et applique chacun via les
+     * setters natifs Android. Les valeurs sont résolues via
+     * {@link ThemeResolver#getStyleAttribute} (qui marche la chaîne
+     * d'héritage parent→parent→... jusqu'à trouver l'attribut).</p>
+     *
+     * @param view la vue cible
+     * @param styleName nom du style (sans le préfixe @style/)
+     */
+    @SuppressWarnings("UnusedDeclaration")
+    private void appliquerStyleViaThemeResolver(View view, String styleName) {
+        // background
+        String bg = themeResolver.getStyleAttribute(styleName, "background");
+        if (bg != null) applyBackground(view, bg);
+
+        // padding (unifié ou individuel)
+        String padding = themeResolver.getStyleAttribute(styleName, "padding");
+        if (padding != null) {
+            int p = parseDim(padding);
+            view.setPadding(p, p, p, p);
+        } else {
+            String pl = themeResolver.getStyleAttribute(styleName, "paddingLeft");
+            String pt = themeResolver.getStyleAttribute(styleName, "paddingTop");
+            String pr = themeResolver.getStyleAttribute(styleName, "paddingRight");
+            String pb = themeResolver.getStyleAttribute(styleName, "paddingBottom");
+            if (pl != null || pt != null || pr != null || pb != null) {
+                view.setPadding(
+                    pl != null ? parseDim(pl) : view.getPaddingLeft(),
+                    pt != null ? parseDim(pt) : view.getPaddingTop(),
+                    pr != null ? parseDim(pr) : view.getPaddingRight(),
+                    pb != null ? parseDim(pb) : view.getPaddingBottom());
+            }
+        }
+
+        // visibility
+        String vis = themeResolver.getStyleAttribute(styleName, "visibility");
+        if (vis != null) {
+            switch (vis) {
+                case "gone": view.setVisibility(View.GONE); break;
+                case "invisible": view.setVisibility(View.INVISIBLE); break;
+                default: view.setVisibility(View.VISIBLE); break;
+            }
+        }
+
+        // enabled, clickable, focusable
+        String enabled = themeResolver.getStyleAttribute(styleName, "enabled");
+        if (enabled != null) view.setEnabled("true".equals(enabled));
+        String clickable = themeResolver.getStyleAttribute(styleName, "clickable");
+        if (clickable != null) view.setClickable("true".equals(clickable));
+        String focusable = themeResolver.getStyleAttribute(styleName, "focusable");
+        if (focusable != null) view.setFocusable("true".equals(focusable));
+
+        // minWidth, minHeight
+        String minWidth = themeResolver.getStyleAttribute(styleName, "minWidth");
+        if (minWidth != null) {
+            int mw = parseDim(minWidth);
+            if (mw > 0) view.setMinimumWidth(mw);
+        }
+        String minHeight = themeResolver.getStyleAttribute(styleName, "minHeight");
+        if (minHeight != null) {
+            int mh = parseDim(minHeight);
+            if (mh > 0) view.setMinimumHeight(mh);
+        }
+
+        // elevation
+        String elevation = themeResolver.getStyleAttribute(styleName, "elevation");
+        if (elevation != null) {
+            float e = parseDim(elevation);
+            if (e > 0) view.setElevation(e);
+        }
+
+        // Attributs texte (si la vue est un TextView)
+        if (view instanceof android.widget.TextView) {
+            android.widget.TextView tv = (android.widget.TextView) view;
+            String textColor = themeResolver.getStyleAttribute(styleName, "textColor");
+            if (textColor != null) {
+                Integer color = resolveColor(textColor);
+                if (color != null) tv.setTextColor(color);
+            }
+            String textSize = themeResolver.getStyleAttribute(styleName, "textSize");
+            if (textSize != null) {
+                float size = parseDim(textSize);
+                if (size > 0) tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, size);
+            }
+            String text = themeResolver.getStyleAttribute(styleName, "text");
+            if (text != null) {
+                String resolved = resolveStringResource(text);
+                tv.setText(resolved != null ? resolved : text);
+            }
+            String textStyle = themeResolver.getStyleAttribute(styleName, "textStyle");
+            if (textStyle != null) {
+                int typeface = android.graphics.Typeface.NORMAL;
+                if (textStyle.contains("bold")) typeface |= android.graphics.Typeface.BOLD;
+                if (textStyle.contains("italic")) typeface |= android.graphics.Typeface.ITALIC;
+                tv.setTypeface(tv.getTypeface(), typeface);
+            }
+        }
+    }
+
+    /**
+     * Résout une référence @string/foo via le ResourceResolver.
+     */
+    private String resolveStringResource(String ref) {
+        if (ref == null || !ref.startsWith("@string/")) return null;
+        if (resourceResolver == null) return null;
+        try {
+            return resourceResolver.getString(ref.substring("@string/".length()));
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     /**

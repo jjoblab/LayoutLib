@@ -86,6 +86,11 @@ class AttributeApplierThemeDrawableTest {
         }
 
         @Override
+        public String getStyleAttribute(String styleName, String attrName) {
+            return null;
+        }
+
+        @Override
         public void clearCache() {
         }
     }

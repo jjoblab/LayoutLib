@@ -317,6 +317,39 @@ public class ThemeResolverImpl implements ThemeResolver {
         return style != null ? style.getParent() : null;
     }
 
+    /**
+     * v3.4.2 — G6 : Récupère la valeur d'un attribut défini dans un style
+     * en marchant la chaîne d'héritage.
+     *
+     * <p>On parcours le style, puis son parent (explicite ou implicite
+     * point-notation), jusqu'à trouver l'attribut ou épuiser la chaîne
+     * (profondeur max 16 pour éviter les cycles).</p>
+     */
+    @Override
+    public String getStyleAttribute(String styleName, String attrName) {
+        if (styleName == null || attrName == null) return null;
+        String courant = styleName;
+        int profondeur = 0;
+        while (courant != null && profondeur < 16) {
+            StyleDefinition style = getStyle(courant);
+            if (style == null) break;
+            String valeur = style.getAttribute(attrName);
+            if (valeur != null) return valeur;
+            // Passer au parent : explicite ou implicite (point-notation).
+            String parent = style.getParent();
+            if (parent == null && courant.contains(".")) {
+                // Parent implicite : "Widget.App.Button" → "Widget.App"
+                int dernierPoint = courant.lastIndexOf('.');
+                if (dernierPoint > 0) {
+                    parent = courant.substring(0, dernierPoint);
+                }
+            }
+            courant = parent;
+            profondeur++;
+        }
+        return null;
+    }
+
     @Override
     public void clearCache() {
         attrCache.clear();
