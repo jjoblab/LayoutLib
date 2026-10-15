@@ -1723,11 +1723,52 @@ public class BridgeInflater {
         if (value == null || value.isEmpty()) {
             return 0;
         }
+        // v3.4.7 — référence @… : résoudre via le ResourceResolver AVANT
+        // l'analyse littérale (miroir du correctif v3.4.4 d'AttributeApplier).
+        // Avant, un layout_width/layout_height/margin/padding portant
+        // « @dimen/spacing_sm » levait InflateException « Dimension
+        // invalide » qui tuait TOUT le rendu — le correctif v3.4.4 ne
+        // couvrait que le chemin AttributeApplier, pas les LayoutParams.
+        // Non résolue → 0 (dégradation visible, jamais de crash).
+        if (value.startsWith("@")) {
+            Float resolue = resolveDimensionReference(value);
+            return resolue != null ? resolue.intValue() : 0;
+        }
         try {
             return (int) parseDimensionInternal(value);
         } catch (NumberFormatException e) {
             throw new InflateException("Dimension invalide : " + value, e);
         }
+    }
+
+    /**
+     * Résout une référence de dimension {@code @dimen/…} en pixels —
+     * d'abord via le [ResourceResolver] (projet + framework, chaînable),
+     * puis en repli natif par identifiant (miroir
+     * d'AttributeApplier.resolveDimension).
+     *
+     * @param ref la référence complète ({@code @dimen/spacing_sm})
+     * @return la valeur en pixels, ou {@code null} si introuvable
+     */
+    private Float resolveDimensionReference(String ref) {
+        if (resourceResolver != null) {
+            Float dim = resourceResolver.getDimension(ref);
+            if (dim != null) {
+                return dim;
+            }
+        }
+        if (ref.startsWith("@dimen/") && context != null) {
+            String name = ref.substring("@dimen/".length());
+            int id = context.getResources().getIdentifier(name, "dimen", context.getPackageName());
+            if (id != 0) {
+                return context.getResources().getDimension(id);
+            }
+            id = context.getResources().getIdentifier(name, "dimen", "android");
+            if (id != 0) {
+                return context.getResources().getDimension(id);
+            }
+        }
+        return null;
     }
 
     /**
