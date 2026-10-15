@@ -481,9 +481,17 @@ public class BridgeInflater {
         if (parent != null) {
             lp = produceLayoutParams(parent, parser);
         } else {
+            // v3.4.6 — Racine SANS parent : honorer les dimensions DÉCLARÉES
+            // sur le tag racine (match_parent / wrap_content / taille fixe),
+            // au lieu d'un WRAP_CONTENT en dur. Dès que la racine est
+            // ré-attachée à un conteneur hôte (chrome de preview, embedding),
+            // ses LayoutParams deviennent effectifs : un WRAP_CONTENT factice
+            // la laissait tassée en haut à gauche au lieu de remplir l'espace
+            // disponible. Mêmes règles de dimension et même défaut que
+            // produceLayoutParams (wrap_content si absent).
             lp = new ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT);
+                    parseLayoutDimension(dimensionDeclareeOuWrap(parser, "layout_width")),
+                    parseLayoutDimension(dimensionDeclareeOuWrap(parser, "layout_height")));
         }
         view.setLayoutParams(lp);
 
@@ -1068,6 +1076,23 @@ public class BridgeInflater {
         if (tagValue != null) {
             view.setTag(tagValue);
         }
+    }
+
+    /**
+     * Valeur déclarée d'un attribut de dimension android: (ex.
+     * {@code layout_width}), avec repli {@code "wrap_content"} si l'attribut
+     * est absent ou vide — même défaut que {@link #produceLayoutParams}.
+     *
+     * @param parser parser positionné sur le START_TAG de la vue
+     * @param name   nom de l'attribut (sans préfixe de namespace)
+     * @return la valeur brute de l'attribut, ou {@code "wrap_content"}
+     */
+    private String dimensionDeclareeOuWrap(XmlPullParser parser, String name) {
+        String valeur = getAttributeValue(parser, "android", name);
+        if (valeur == null || valeur.isEmpty()) {
+            return "wrap_content";
+        }
+        return valeur;
     }
 
     /**
