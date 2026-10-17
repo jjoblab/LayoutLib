@@ -20,3 +20,18 @@ tasks.register("testAllModules") {
         ":validation:test"
     )
 }
+
+// Publication GitHub Packages (mise en place du 2026-10-17, miroir des
+// dépôts codeide-tooling / codeide-lsp — docs CodeIDE
+// PLAN_SEPARATION_DEPOTS.md §9) : coordonnées com.github.jjoblab.LayoutLib:<module>,
+// les MÊMES coordonnées que la consommation composite de CodeIDE
+// (substitution settings.gradle.kts — la version déclarée est ignorée
+// en dev, l'épinglage = version du catalogue + tag du dépôt).
+val proprietesVersion = java.util.Properties().apply {
+    rootProject.file("version.properties").inputStream().use { load(it) }
+}
+
+allprojects {
+    group = "com.github.jjoblab.LayoutLib"
+    version = proprietesVersion.getProperty("VERSION_NAME")
+}

@@ -1,0 +1,52 @@
+# LayoutLib — publication des artefacts sur GitHub Packages.
+#
+# Miroir des workflows codeide-tooling / codeide-lsp (mise en place du
+# 2026-10-17 — docs CodeIDE PLAN_SEPARATION_DEPOTS.md §9). Déclenchée par
+# un tag v* (release) ou manuellement (workflow_dispatch — utilisée pour
+# la première publication de la 3.4.7, le tag v3.4.7 étant antérieur à ce
+# workflow). Le GITHUB_TOKEN du dépôt suffit (packages: write) — aucun
+# secret supplémentaire. Les CONSOMMATEURS hors dépôt (CodeIDE) ont
+# besoin d'un PAT read:packages pour résoudre ces coordonnées.
+#
+# Coordonnées : com.github.jjoblab.LayoutLib:module-{inflater,resources,
+# drawables,themes,attributes,layout} (composant release, AAR) — les
+# MÊMES coordonnées que la consommation composite de CodeIDE.
+name: Publication GitHub Packages
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: pub-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publier:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer les sources
+        uses: actions/checkout@v4
+
+      - name: JDK 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Gradle (cache)
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Accepter les licences du SDK Android
+        run: yes | sdkmanager --licenses >/dev/null || true
+
+      - name: Publier (composant release des 6 modules)
+        run: ./gradlew publish --stacktrace
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
