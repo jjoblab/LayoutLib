@@ -253,6 +253,15 @@ public final class ViewTagRegistry {
         register("BottomAppBar", "com.google.android.material.bottomappbar.BottomAppBar", "buttons.ButtonDesign");
         register("ShapeableImageView", "com.google.android.material.imageview.ShapeableImageView", "widgets.ImageViewDesign");
         register("MaterialDivider", "com.google.android.material.divider.MaterialDivider", "widgets.ViewDesign");
+        // v3.4.9 — vues Material citées par la palette CodeIDE (41 tuiles)
+        // mais ABSENTES du registre : sans entrée, un tag court partait en
+        // android.widget.{tag} → introuvable → MockView. La palette insère
+        // la forme FQN (qui passe déjà), mais l'écriture manuelle du tag
+        // court doit rendre la MÊME vue.
+        register("MaterialToolbar", "com.google.android.material.appbar.MaterialToolbar", "layouts.FrameLayoutDesign");
+        register("MaterialRatingBar", "com.google.android.material.ratingbar.MaterialRatingBar", "widgets.ViewDesign");
+        register("SearchBar", "com.google.android.material.search.SearchBar", "layouts.FrameLayoutDesign");
+        register("MaterialButtonToggleGroup", "com.google.android.material.button.MaterialButtonToggleGroup", "layouts.LinearLayoutDesign");
 
         // Android Framework views additionnelles
         register("AbsListView", "android.widget.AbsListView", "layouts.FrameLayoutDesign");

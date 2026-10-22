@@ -3,6 +3,7 @@ package jo.layoutlib.inflater;
 import android.util.Log;
 import android.animation.LayoutTransition;
 import android.content.Context;
+import android.view.ContextThemeWrapper;
 import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -555,8 +556,26 @@ public class BridgeInflater {
      *                          factory lève
      */
     private View onCreateViewFromFactory(String tag, ViewGroup parent) {
+        return onCreateViewFromFactory(tag, parent, context);
+    }
+
+    /**
+     * Variante du contexte EXPLICITE (v3.4.9 — repli thème Material) :
+     * le repli ré-instancie la vue sous un {@link ContextThemeWrapper}
+     * Material3 sans toucher au contexte nominal de l'inflater.
+     *
+     * @param tag    le nom du tag XML
+     * @param parent le parent (peut être {@code null} pour la racine)
+     * @param ctx    le contexte d'INSTANCIATION (le classloader reste
+     *               celui du contexte nominal — {@link ViewFactory} charge
+     *               les classes depuis SON contexte, instancie depuis celui-ci)
+     * @return la vue créée
+     * @throws InflateException si aucune création ne réussit, ou si la
+     *                          factory lève
+     */
+    private View onCreateViewFromFactory(String tag, ViewGroup parent, Context ctx) {
         if (factory2 == null) {
-            return viewFactory.createView(tag);
+            return viewFactory.createView(tag, ctx);
         }
         View view;
         try {
@@ -566,7 +585,7 @@ public class BridgeInflater {
             // On utilise un NopAttributeSet (vide) — les attributs réels sont
             // appliqués APRÈS par AttributeApplier (pattern LayoutLib).
             AttributeSet attrs = new NopAttributeSet();
-            view = factory2.onCreateView(parent, tag, context, attrs);
+            view = factory2.onCreateView(parent, tag, ctx, attrs);
         } catch (RuntimeException e) {
             throw new InflateException(
                     "La Factory2 a échoué pour <" + tag + "> : " + e.getMessage(), e);
@@ -576,18 +595,23 @@ public class BridgeInflater {
             return view;
         }
         // Retour null : création par défaut (sémantique AOSP)
-        return viewFactory.createView(tag);
+        return viewFactory.createView(tag, ctx);
     }
 
     /**
-     * Crée une vue avec dégradation gracieuse — v3.4.0 / G15.
+     * Crée une vue avec dégradation gracieuse — v3.4.0 / G15, étendu v3.4.9.
      *
      * <p>Si {@link #onCreateViewFromFactory} lève (ClassNotFoundException,
      * NoSuchMethodException, InvocationTargetException, theme-enforcement
-     * IllegalArgumentException, etc.), on crée un {@link MockView} à
-     * la place. Le rendu continue — l'utilisateur voit un rectangle
-     * « placeholder » là où la vue custom aurait dû être, au lieu d'une
-     * page blanche avec un message d'erreur.</p>
+     * IllegalArgumentException, etc.), on tente D'ABORD le repli thème
+     * Material (v3.4.9 — {@link #retenterAvecThemeMaterial}) : une vue
+     * {@code com.google.android.material.*} qui lève le theme-enforcement
+     * (« The theme on this view is not a MaterialComponents theme ») est
+     * ré-instanciée sous un contexte Material3 — la VRAIE vue remplace le
+     * MockView. Sinon, on crée un {@link MockView} à la place. Le rendu
+     * continue — l'utilisateur voit un rectangle « placeholder » là où la
+     * vue custom aurait dû être, au lieu d'une page blanche avec un message
+     * d'erreur.</p>
      *
      * <p>Le {@code MockView} porte le nom de la classe originale (via
      * {@link MockView#setOriginalClassName}) pour le diagnostic : la vue UI
@@ -600,18 +624,32 @@ public class BridgeInflater {
      *
      * @param tag    le nom du tag XML
      * @param parent le parent (peut être {@code null})
-     * @return la vue créée (réelle ou MockView)
+     * @return la vue créée (réelle, repli Material ou MockView)
      */
     private View createViewSafely(String tag, ViewGroup parent) {
         try {
             return onCreateViewFromFactory(tag, parent);
         } catch (InflateException e) {
+            // v3.4.9 — repli thème Material AVANT le MockView : la classe
+            // existe (chip, slider, textfield…) mais le thème de l'hôte
+            // n'est pas Material. Retentée sous Material3, la vue réelle
+            // rend — c'est le « moins de MockView » du retour propriétaire.
+            View vue = retenterAvecThemeMaterial(tag, parent, e);
+            if (vue != null) {
+                return vue;
+            }
             // ClassNotFoundException, NoSuchMethodException, etc. — la classe
             // n'est pas sur le classpath de l'IDE (vue custom projet/library).
             // Dérade vers MockView + journalise pour le diagnostic.
             logViewCreationFailure(tag, e);
             return newMockView(tag);
         } catch (RuntimeException e) {
+            // v3.4.9 — même repli pour le theme-enforcement nu (lancé hors
+            // InflateException par certains constructeurs Material).
+            View vue = retenterAvecThemeMaterial(tag, parent, e);
+            if (vue != null) {
+                return vue;
+            }
             // InvocationTargetException (constructeur qui lève), theme-
             // enforcement IllegalArgumentException, etc. — la classe existe
             // mais son instanciation échoue. Idem : MockView + journalise.
@@ -619,6 +657,87 @@ public class BridgeInflater {
             return newMockView(tag);
         }
     }
+
+    /**
+     * Le REPLI THÈME MATERIAL (v3.4.9) — moins de MockView.
+     *
+     * <p>Les vues {@code com.google.android.material.*} vérifient le thème
+     * du contexte à la construction ({@code ThemeEnforcement} → « The
+     * theme on this view is not a MaterialComponents theme »). Une app
+     * hôte au thème AppCompat (l'app de démonstration, un IDE, un outil
+     * tiers) voient donc TOUTES ses vues Material partir en MockView alors
+     * que les classes existent. Le repli ré-instancie la vue sous un
+     * {@link ContextThemeWrapper} Material3 : la vue est RÉELLE (styles
+     * Material par défaut, pas ceux du projet — honnête, mais bien plus
+     * fidèle qu'un cadre hachuré) et le rendu continue.</p>
+     *
+     * <p>La décision est testée JVM : classe Material + cause racine
+     * {@link IllegalArgumentException} (la signature du theme-enforcement).
+     * Toute autre cause (NPE, Resources.NotFound…) retourne {@code null}
+     * → MockView, comme avant.</p>
+     *
+     * @param tag    le nom du tag XML
+     * @param parent le parent (peut être {@code null})
+     * @param cause  l'échec de la première tentative
+     * @return la vue créée sous thème Material3, ou {@code null} (le repli
+     *         ne s'applique pas ou échoue à son tour)
+     */
+    private View retenterAvecThemeMaterial(String tag, ViewGroup parent, RuntimeException cause) {
+        String className = tagRegistry.resolveClassName(tag);
+        if (!repliThemeMaterialApplicable(className, cause)) {
+            return null;
+        }
+        try {
+            View vue = onCreateViewFromFactory(tag, parent, contexteMaterial());
+            System.err.println("[BridgeInflater] repli thème Material3 pour <" + tag
+                    + "> : le thème hôte n'est pas Material — vraie vue au lieu du MockView");
+            return vue;
+        } catch (RuntimeException retry) {
+            // Le repli échoue aussi : MockView (chemin inchangé).
+            return null;
+        }
+    }
+
+    /**
+     * La décision du repli thème Material — PURE (testée JVM) : la classe
+     * résolue vit dans {@code com.google.android.material.*} ET la cause
+     * racine est une {@link IllegalArgumentException} (theme-enforcement).
+     * Toute autre combinaison reste sur le MockView.
+     *
+     * @param className la classe résolue du tag (peut être {@code null} — tag spécial)
+     * @param cause     l'échec de la première instanciation
+     * @return {@code true} si le repli s'applique
+     */
+    static boolean repliThemeMaterialApplicable(String className, Throwable cause) {
+        if (className == null || !className.startsWith("com.google.android.material.")) {
+            return false;
+        }
+        Throwable racine = cause;
+        while (racine != null) {
+            if (racine instanceof IllegalArgumentException) {
+                return true;
+            }
+            racine = racine.getCause();
+        }
+        return false;
+    }
+
+    /**
+     * Le contexte de repli Material3 (paresseux, réutilisé) : un
+     * {@link ContextThemeWrapper} posé sur le contexte de l'inflater.
+     * Les resource IDS restent ceux de l'HÔTE (seul le thème change),
+     * le classloader aussi — la vue charge depuis les mêmes classes.
+     */
+    private Context contexteMaterial() {
+        if (contexteMaterialCache == null) {
+            contexteMaterialCache = new ContextThemeWrapper(
+                    context, com.google.android.material.R.style.Theme_Material3_DayNight_NoActionBar);
+        }
+        return contexteMaterialCache;
+    }
+
+    /** Cache du contexte de repli Material3 (v3.4.9). */
+    private Context contexteMaterialCache;
 
     /**
      * Journalise l'échec de création d'une vue — niveau WARNING, pas FINE,

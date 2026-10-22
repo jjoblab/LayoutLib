@@ -50,6 +50,27 @@ dependencies {
     implementation(libs.androidx.core)
     implementation(libs.androidx.annotation)
 
+    // v3.4.9 — VRAIES VUES, MOINS DE MOCKVIEW (retour propriétaire
+    // 2026-10-22 : « un chip tombe sur MockView, bien d'autres vues
+    // aussi ») : le ViewTagRegistry référence des classes AndroidX et
+    // Material (Chip, MaterialButton, CoordinatorLayout, TabLayout,
+    // ViewPager2, TextInputLayout…). Sans elles sur le classpath de
+    // l'HÔTE, la réflexion échoue et BridgeInflater dégrade vers
+    // MockView. En les portant DANS le module, elles sont garanties
+    // partout : l'app de démonstration, CodeIDE, tout consommateur —
+    // et le repli thème Material (BridgeInflater) peut référencer les
+    // styles Material3 à la compilation.
+    implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.recyclerview)
+    implementation(libs.androidx.constraintlayout)
+    implementation(libs.material)
+    implementation(libs.androidx.viewpager)
+    implementation(libs.androidx.viewpager2)
+    implementation(libs.androidx.cardview)
+    implementation(libs.androidx.gridlayout)
+    implementation(libs.androidx.drawerlayout)
+    implementation(libs.androidx.swiperefreshlayout)
+
     // Tests unitaires JVM (JUnit 5)
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)

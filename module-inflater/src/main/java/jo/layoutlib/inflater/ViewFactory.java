@@ -50,7 +50,9 @@ public class ViewFactory {
      * @throws InflateException si la création échoue
      */
     public View createView(String tag) {
-        return createView(tag, null);
+        // Cast explicite : depuis v3.4.9, createView(String, Context) existe
+        // aussi — un `null` nu serait ambigu entre les deux surcharges.
+        return createView(tag, (AttributeSet) null);
     }
 
     /**
@@ -75,6 +77,28 @@ public class ViewFactory {
     }
 
     /**
+     * Variante à contexte EXPLICITE (v3.4.9 — repli thème Material du
+     * {@code BridgeInflater}) : le CLASSLOADER reste celui du contexte
+     * nominal de cette factory (les classes se chargent depuis l'hôte),
+     * seul le contexte passé au CONSTRUCTEUR DE LA VUE change — un
+     * {@code ContextThemeWrapper} Material3 laisse passer le theme-
+     * enforcement des vues Material.
+     *
+     * @param tag nom du tag XML
+     * @param ctx le contexte d'INSTANCIATION (peut différer du contexte nominal)
+     * @return la vue instanciée
+     * @throws InflateException si la création échoue
+     */
+    public View createView(String tag, Context ctx) {
+        String className = tagRegistry.resolveClassName(tag);
+        if (className == null) {
+            throw new InflateException(
+                    "Aucune classe associée au tag '" + tag + "' (tag spécial ?)");
+        }
+        return createViewByName(className, null, ctx);
+    }
+
+    /**
      * Crée une vue à partir d'un nom de classe, SANS attributs.
      *
      * @param className nom pleinement qualifié
@@ -92,6 +116,21 @@ public class ViewFactory {
      * @return la vue instanciée
      */
     public View createViewByName(String className, AttributeSet attrs) {
+        return createViewByName(className, attrs, context);
+    }
+
+    /**
+     * Variante à contexte EXPLICITE (v3.4.9) : instancie la vue avec
+     * {@code contexte} (le repli thème Material du {@code BridgeInflater}
+     * passe un wrapper Material3), les classes continuant de se charger
+     * depuis le classloader du contexte nominal.
+     *
+     * @param className nom pleinement qualifié
+     * @param attrs     les attributs XML (peut être null)
+     * @param contexte  le contexte d'INSTANCIATION
+     * @return la vue instanciée
+     */
+    public View createViewByName(String className, AttributeSet attrs, Context contexte) {
         Constructor<?> constructor = constructorCache.get(className + (attrs != null ? "_attrs" : ""));
         if (constructor == null) {
             constructor = resolveConstructor(className, attrs != null);
@@ -100,9 +139,9 @@ public class ViewFactory {
         try {
             // getParameterTypes().length plutôt que getParameterCount() (API 26+).
             if (attrs != null && constructor.getParameterTypes().length == 2) {
-                return (View) constructor.newInstance(context, attrs);
+                return (View) constructor.newInstance(contexte, attrs);
             } else {
-                return (View) constructor.newInstance(context);
+                return (View) constructor.newInstance(contexte);
             }
         } catch (InstantiationException e) {
             throw new InflateException(

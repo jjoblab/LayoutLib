@@ -22,6 +22,18 @@ androidxRecyclerview = "1.4.0"
 androidxConstraintlayout = "2.1.4"
 material = "1.14.0"
 
+# v3.4.9 — bibliothèques que le ViewTagRegistry référence : elles doivent
+# être sur le classpath de l'hôte pour que les vues existent (sinon MockView).
+# viewpager2/swiperefreshlayout = versions de CodeIDE ; les autres sont les
+# seules stables de Google Maven (cardview/gridlayout 1.0.0,
+# drawerlayout 1.1.1, viewpager legacy 1.1.0).
+androidxViewpager = "1.1.0"
+androidxViewpager2 = "1.1.0"
+androidxCardview = "1.0.0"
+androidxGridlayout = "1.0.0"
+androidxDrawerlayout = "1.1.1"
+androidxSwiperefreshlayout = "1.2.0"
+
 # Tests JVM
 junitJupiter = "5.10.2"
 # Gradle 9 exige le lanceur JUnit Platform EXPLICITE sur le classpath
@@ -50,6 +62,12 @@ androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "a
 androidx-recyclerview = { module = "androidx.recyclerview:recyclerview", version.ref = "androidxRecyclerview" }
 androidx-constraintlayout = { module = "androidx.constraintlayout:constraintlayout", version.ref = "androidxConstraintlayout" }
 material = { module = "com.google.android.material:material", version.ref = "material" }
+androidx-viewpager = { module = "androidx.viewpager:viewpager", version.ref = "androidxViewpager" }
+androidx-viewpager2 = { module = "androidx.viewpager2:viewpager2", version.ref = "androidxViewpager2" }
+androidx-cardview = { module = "androidx.cardview:cardview", version.ref = "androidxCardview" }
+androidx-gridlayout = { module = "androidx.gridlayout:gridlayout", version.ref = "androidxGridlayout" }
+androidx-drawerlayout = { module = "androidx.drawerlayout:drawerlayout", version.ref = "androidxDrawerlayout" }
+androidx-swiperefreshlayout = { module = "androidx.swiperefreshlayout:swiperefreshlayout", version.ref = "androidxSwiperefreshlayout" }
 
 # Tests JVM — junit-jupiter (agrégat api+params+engine) suffit pour
 # testImplementation ; plus besoin de déclarer api/engine séparément.

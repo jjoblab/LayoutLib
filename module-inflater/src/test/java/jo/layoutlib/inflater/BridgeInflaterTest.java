@@ -123,4 +123,53 @@ class BridgeInflaterTest {
             assertThat(new java.util.HashMap<Integer, android.view.View>()).isEmpty();
         }
     }
+
+    @Nested
+    @DisplayName("v3.4.9 — Repli thème Material (décision pure)")
+    class RepliThemeMaterial {
+
+        @Test
+        @DisplayName("classe Material + IllegalArgumentException racine → repli applicable")
+        void shouldApplyForMaterialClassWithIllegalArgumentRoot() {
+            InflateException emballee = new InflateException(
+                    "La Factory2 a échoué pour <Chip>",
+                    new IllegalArgumentException(
+                            "The theme on this view is not a MaterialComponents theme"));
+            assertThat(BridgeInflater.repliThemeMaterialApplicable(
+                    "com.google.android.material.chip.Chip", emballee)).isTrue();
+        }
+
+        @Test
+        @DisplayName("IllegalArgumentException DIRECTE (sans chaîne) → repli applicable")
+        void shouldApplyForDirectIllegalArgument() {
+            assertThat(BridgeInflater.repliThemeMaterialApplicable(
+                    "com.google.android.material.slider.Slider",
+                    new IllegalArgumentException("theme"))).isTrue();
+        }
+
+        @Test
+        @DisplayName("classe non Material (androidx.*) → JAMAIS de repli")
+        void shouldNeverApplyOutsideMaterialPackage() {
+            assertThat(BridgeInflater.repliThemeMaterialApplicable(
+                    "androidx.recyclerview.widget.RecyclerView",
+                    new IllegalArgumentException("theme"))).isFalse();
+        }
+
+        @Test
+        @DisplayName("autre cause racine (NPE) → pas de repli (MockView inchangé)")
+        void shouldNotApplyForOtherCause() {
+            InflateException emballee = new InflateException(
+                    "La Factory2 a échoué pour <Chip>",
+                    new NullPointerException("resources"));
+            assertThat(BridgeInflater.repliThemeMaterialApplicable(
+                    "com.google.android.material.chip.Chip", emballee)).isFalse();
+        }
+
+        @Test
+        @DisplayName("classe nulle (tag spécial) → pas de repli")
+        void shouldNotApplyForNullClass() {
+            assertThat(BridgeInflater.repliThemeMaterialApplicable(
+                    null, new IllegalArgumentException("theme"))).isFalse();
+        }
+    }
 }

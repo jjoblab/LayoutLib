@@ -200,5 +200,24 @@ class ViewTagRegistryTest {
             assertThat(registry.resolveClassName("MyCustomView"))
                     .isEqualTo("jo.layoutlib.design.widgets.ViewDesign");
         }
+        @Test
+        @DisplayName("v3.4.9 — MaterialToolbar (palette CodeIDE) résout vers Material")
+        void shouldResolveMaterialToolbarToMaterialClass() {
+            // Retour propriétaire 2026-10-22 : sans entrée, le tag court
+            // partait en android.widget.MaterialToolbar → MockView.
+            assertThat(registry.resolveClassName("MaterialToolbar"))
+                    .isEqualTo("jo.layoutlib.design.layouts.FrameLayoutDesign");
+        }
+
+        @Test
+        @DisplayName("v3.4.9 — MaterialRatingBar, SearchBar et MaterialButtonToggleGroup résolvent")
+        void shouldResolveNewMaterialShortTags() {
+            assertThat(registry.resolveClassName("MaterialRatingBar"))
+                    .isEqualTo("jo.layoutlib.design.widgets.ViewDesign");
+            assertThat(registry.resolveClassName("SearchBar"))
+                    .isEqualTo("jo.layoutlib.design.layouts.FrameLayoutDesign");
+            assertThat(registry.resolveClassName("MaterialButtonToggleGroup"))
+                    .isEqualTo("jo.layoutlib.design.layouts.LinearLayoutDesign");
+        }
     }
 }
