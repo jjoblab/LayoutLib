@@ -95,8 +95,15 @@ public class BridgeInflater {
     /** Map des vues indexées par id. */
     private final Map<Integer, View> idToView = new HashMap<>();
 
-    /** Compteur d'ids générés pour les vues sans id. */
-    private int generatedIdCounter = 0x7f0a0001;
+    /**
+     * Map NOM → ID des ids dynamiques (v3.5.1 — S3-étude § 2.3.3) : STABLE
+     * pour tout le cycle de vie de l'inflater — deux vues référençant le
+     * même {@code @id/x} obtiennent le MÊME id, l'ordre de résolution ne
+     * compte plus (ancêtres {@code layout_below}, contraintes, ancres
+     * réparés). Miroir {@code bridge/util/DynamicIdMap} de la référence.
+     */
+    private final jo.layoutlib.inflater.bridge.util.DynamicIdMap dynamicIds =
+            new jo.layoutlib.inflater.bridge.util.DynamicIdMap();
 
     /** Indique si le inflater doit lever une exception sur les attributs inconnus. */
     private boolean strictMode = false;
@@ -1259,9 +1266,10 @@ public class BridgeInflater {
             // Attributs de positionnement RelativeLayout
             applyRelativeLayoutRules(rlLp, parser, idToView);
             String gravity = getAttributeValue(parser, "android", "layout_gravity");
-            if (gravity != null) {
-                rlLp.addRule(android.widget.RelativeLayout.CENTER_IN_PARENT);
-            }
+            // v3.5.1 — S3-étude § 2.3.2 : la valeur de layout_gravity était
+            // IGNORÉE (toujours CENTER_IN_PARENT) ; la gravité demandée est
+            // appliquée au champ de LayoutParams.
+            applyRelativeLayoutGravity(rlLp, gravity);
             lp = rlLp;
         } else if (parent instanceof android.widget.GridLayout) {
             android.widget.GridLayout.LayoutParams glLp =
@@ -1446,8 +1454,10 @@ public class BridgeInflater {
             if (resolved != 0) {
                 return resolved;
             }
-            // Génère un id unique pour les vues créées dynamiquement
-            return generatedIdCounter++;
+            // v3.5.1 — S3-étude § 2.3.3 : id STABLE par nom (miroir
+            // DynamicIdMap de la référence) — le compteur régénérait un id
+            // DIFFÉRENT à chaque appel pour le même nom.
+            return dynamicIds.getId(name);
         }
         if (idValue.startsWith("@android:id/")) {
             String name = idValue.substring("@android:id/".length());
@@ -1588,6 +1598,91 @@ public class BridgeInflater {
     }
 
     /**
+     * Applique la GRAVITÉ d'un enfant de RelativeLayout à ses LayoutParams
+     * (v3.5.1 — S3-étude § 2.3.2 : la valeur lue est honorée, plus de
+     * CENTER_IN_PARENT imposé).
+     *
+     * <p>Portée package : testée en JVM (patron BridgeInflaterDimenReferenceTest).
+     * La translation elle-même vit dans {@link #reglesDeGraviteRelative(String)}
+     * — PURE, observable sous l'android.jar mockable (addRule y est un
+     * no-op : on teste la DONNÉE, pas l'appel).</p>
+     *
+     * @param rlLp    les LayoutParams de l'enfant
+     * @param gravity la valeur de {@code layout_gravity} (peut être null)
+     */
+    void applyRelativeLayoutGravity(android.widget.RelativeLayout.LayoutParams rlLp,
+                                    String gravity) {
+        for (int regle : reglesDeGraviteRelative(gravity)) {
+            rlLp.addRule(regle);
+        }
+    }
+
+    /**
+     * La GRAVITÉ d'un enfant de RelativeLayout traduite en RÈGLES parent
+     * (v3.5.1 — S3-étude § 2.3.2) : en RelativeLayout l'alignement
+     * s'exprime par des RÈGLES, pas par un champ — {@code end|bottom} →
+     * ALIGN_PARENT_END + ALIGN_PARENT_BOTTOM, {@code center} →
+     * CENTER_IN_PARENT. La traduction est PAR JETON (miroir du découpage
+     * de {@code parseGravity}) : les BITS de gravité se CHEVAUCHENT
+     * (END porte le bit de CENTER_HORIZONTAL, BOTTOM celui de
+     * CENTER_VERTICAL — un masque {@code & CENTER} confondrait
+     * {@code end|bottom} avec {@code center}) ; {@code fill} et variantes
+     * n'ont AUCUNE règle équivalente, null/vide → AUCUNE règle.
+     *
+     * <p>PURE et STATIQUE : les constantes de règles sont des champs
+     * {@code static final} (réels même sous l'android.jar mockable).</p>
+     *
+     * @param gravity la valeur de {@code layout_gravity} (peut être null)
+     * @return les règles parent à poser, dans l'ordre des jetons
+     */
+    static int[] reglesDeGraviteRelative(String gravity) {
+        if (gravity == null) {
+            return new int[0];
+        }
+        java.util.List<Integer> regles = new java.util.ArrayList<>();
+        for (String brut : gravity.split("\\|")) {
+            switch (brut.trim()) {
+                case "center":
+                    regles.add(android.widget.RelativeLayout.CENTER_IN_PARENT);
+                    break;
+                case "center_vertical":
+                    regles.add(android.widget.RelativeLayout.CENTER_VERTICAL);
+                    break;
+                case "center_horizontal":
+                    regles.add(android.widget.RelativeLayout.CENTER_HORIZONTAL);
+                    break;
+                case "start":
+                    regles.add(android.widget.RelativeLayout.ALIGN_PARENT_START);
+                    break;
+                case "end":
+                    regles.add(android.widget.RelativeLayout.ALIGN_PARENT_END);
+                    break;
+                case "left":
+                    regles.add(android.widget.RelativeLayout.ALIGN_PARENT_LEFT);
+                    break;
+                case "right":
+                    regles.add(android.widget.RelativeLayout.ALIGN_PARENT_RIGHT);
+                    break;
+                case "top":
+                    regles.add(android.widget.RelativeLayout.ALIGN_PARENT_TOP);
+                    break;
+                case "bottom":
+                    regles.add(android.widget.RelativeLayout.ALIGN_PARENT_BOTTOM);
+                    break;
+                default:
+                    // fill, fill_horizontal, fill_vertical… : aucune règle
+                    // équivalente — silencieusement ignorés.
+                    break;
+            }
+        }
+        int[] sortie = new int[regles.size()];
+        for (int i = 0; i < regles.size(); i++) {
+            sortie[i] = regles.get(i);
+        }
+        return sortie;
+    }
+
+    /**
      * Applique les spécifications de GridLayout (row, column, span).
      *
      * @param glLp   les LayoutParams du GridLayout
@@ -1596,7 +1691,10 @@ public class BridgeInflater {
     private void applyGridLayoutSpec(android.widget.GridLayout.LayoutParams glLp,
                                       XmlPullParser parser) {
         String layout_row = getAttributeValue(parser, "android", "layout_row");
-        String layout_column = getAttributeValue(parser, "android", "layout_rowSpan");
+        // v3.5.1 — S3-étude § 2.3.1 : layout_column était lu depuis
+        // layout_rowSpan (copier-coller) — tout GridLayout portant
+        // layout_column était mal placé.
+        String layout_column = getAttributeValue(parser, "android", "layout_column");
         String layout_rowSpan = getAttributeValue(parser, "android", "layout_rowSpan");
         String layout_columnSpan = getAttributeValue(parser, "android", "layout_columnSpan");
         String layout_gravity = getAttributeValue(parser, "android", "layout_gravity");
@@ -1808,12 +1906,10 @@ public class BridgeInflater {
         }
         int id = context.getResources().getIdentifier(name, "id", context.getPackageName());
         if (id != 0) return id;
-        // Chercher dans idToView
-        for (Map.Entry<Integer, View> entry : idToView.entrySet()) {
-            // Pas possible de retrouver le nom depuis l'id sans Resources
-            // On utilise generateViewId pour les ids créés
-        }
-        return View.generateViewId();
+        // v3.5.1 — S3-étude § 2.3.3 : même map STABLE que les attributs
+        // android:id — la référence ne génère JAMAIS deux ids pour un même
+        // nom (ancres et contraintes non déterministes sinon).
+        return dynamicIds.getId(name);
     }
 
     /**
@@ -1974,7 +2070,9 @@ public class BridgeInflater {
      */
     public void reset() {
         idToView.clear();
-        generatedIdCounter = 0x7f0a0001;
+        // v3.5.1 — S3-étude § 2.3.3 : la map des ids dynamiques suit le
+        // compteur historique (nouveau document = nouveaux ids).
+        dynamicIds.clear();
         // v3.4.0 — G12 : ne PAS vider viewFactory.clearCache() — les
         // constructeurs sont stables entre rendus, le cache accélère
         // les re-rendus de 50-100x sur les gros layouts.
