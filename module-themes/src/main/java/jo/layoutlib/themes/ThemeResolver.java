@@ -66,6 +66,21 @@ public interface ThemeResolver {
     void setNightMode(boolean nightMode);
 
     /**
+     * Le régime nuit COURANT des résolveurs.
+     *
+     * <p>PE13 (ADR 0137 D2) : la nuit est le RÉGIME DE RÉSOLUTION des
+     * ressources et thèmes — PAS un drapeau du simulateur de barres. Le
+     * chrome système du moteur (miroir du {@code Layout.Builder} AOSP) relit
+     * ce contrat pour ses couleurs par défaut jour/nuit ; le moteur de
+     * référence n'a PAS de drapeau nuit équivalent. L'implémentation
+     * existe déjà ({@code ThemeResolverImpl.isNightMode()}) — le contrat
+     * l'expose aux consommateurs du module.</p>
+     *
+     * @return {@code true} si le régime nuit est actif
+     */
+    boolean isNightMode();
+
+    /**
      * Récupère le nom du parent direct d'un style.
      *
      * @param styleName nom du style

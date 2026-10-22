@@ -81,6 +81,11 @@ class AttributeApplierThemeDrawableTest {
         }
 
         @Override
+        public boolean isNightMode() {
+            return false;
+        }
+
+        @Override
         public String getParentStyle(String styleName) {
             return null;
         }

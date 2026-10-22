@@ -1,25 +1,46 @@
 package jo.layoutlib.resources.api;
 
 /**
- * ViewType, inspiré de l AOSP layoutlib-api.
+ * Le MARQUAGE d'une vue SYSTÈME du décor de rendu, miroir du
+ * {@code ViewType} de l'AOSP layoutlib-api (PE13, ADR 0137 D5).
+ *
+ * <p>Le moteur de rendu possède le chrome système ; à chaque rendu il produit
+ * DEUX arbres d'infos — le CONTENU de l'utilisateur et le DÉCOR. Chaque nœud
+ * du décor porte son {@code ViewType}, exactement comme le
+ * {@code SystemViewInfo} de la référence : l'IDE peut exclure le chrome de
+ * l'arbre des composants et, plus tard, y réintroduire une section
+ * « système » interprétable (les menus de l'action bar y sont marqués chez la
+ * référence pour exactement cet usage).</p>
+ *
+ * <p>Ancienne coquille (v1.0, nom/valeur sans sémantique) : code mort
+ * vérifié, remplacé par l'enum.</p>
  *
  * @author jo@Dev
- * @since 1.0
+ * @since 3.5.0
  */
-public class ViewType {
+public enum ViewType {
 
-    private String name;
-    private Object value;
+    /** Nœud système de type inconnu (repli défensif). */
+    UNKNOWN,
 
-    public ViewType() {
-    }
+    /** Vue de l'APPLICATION (conteneurs du décor qui ne sont pas des barres). */
+    APPLICATION,
 
-    public ViewType(String name) {
-        this.name = name;
-    }
+    /** La STATUS BAR du décor. */
+    STATUS_BAR,
 
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-    public Object getValue() { return value; }
-    public void setValue(Object value) { this.value = value; }
+    /** La BARRE DE NAVIGATION du décor (trois boutons ou pilule gestuelle). */
+    NAVIGATION_BAR,
+
+    /** L'ACTION BAR factice du décor. */
+    ACTION_BAR,
+
+    /** Le MENU de l'action bar (les items d'action — miroir AOSP). */
+    ACTION_BAR_MENU,
+
+    /** Le BOUTON de débordement (⋮) de l'action bar — miroir AOSP. */
+    ACTION_BAR_OVERFLOW,
+
+    /** Le POPUP de débordement ouvert — miroir AOSP. */
+    ACTION_BAR_OVERFLOW_MENU
 }

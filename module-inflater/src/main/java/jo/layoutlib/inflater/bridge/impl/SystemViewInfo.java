@@ -1,109 +1,55 @@
 package jo.layoutlib.inflater.bridge.impl;
 
+import jo.layoutlib.inflater.ViewInfoCollector;
+import jo.layoutlib.resources.api.ViewType;
+
 /**
- * Informations système sur une vue (visibilité, focus), inspiré de
- * {@code com.android.layoutlib.bridge.impl.SystemViewInfo} de l'AOSP.
+ * Les infos d'un nœud SYSTÈME du décor de rendu, miroir du
+ * {@code SystemViewInfo} de l'AOSP (PE13, ADR 0137 D5) : une info de vue
+ * PORTANT son {@link ViewType} — le marquage qui permet à l'IDE d'exclure
+ * le chrome de l'arbre des composants et, plus tard, d'y réintroduire une
+ * section « système » interprétable.
  *
- * <p>Cette classe étend {@link Layout.ViewInfo} en ajoutant des informations
- * système comme la visibilité, le focus, et l'accessibilité.</p>
+ * <p>Ancienne classe (v1.0, focus/visibilité — SÉMANTIQUE DIFFÉRENTE de la
+ * référence) : code mort vérifié, réécrite. L'ancien contrat d'« infos
+ * système sur une vue » est obsolète : la visibilité vit déjà dans
+ * {@link ViewInfoCollector.ViewInfo}, le marquage du décor est le vrai rôle
+ * de ce nom chez la référence.</p>
  *
  * @author jo@Dev
- * @since 1.0
+ * @since 3.5.0
  */
-public class SystemViewInfo extends Layout.ViewInfo {
+public class SystemViewInfo extends ViewInfoCollector.ViewInfo {
 
-    /** Visibilité : visible. */
-    public static final int VISIBLE = 0;
-
-    /** Visibilité : invisible (occupe de la place). */
-    public static final int INVISIBLE = 4;
-
-    /** Visibilité : gone (ne prend pas de place). */
-    public static final int GONE = 8;
-
-    /** Indique si la vue a le focus. */
-    private final boolean hasFocus;
-
-    /** Indique si la vue est focusable. */
-    private final boolean focusable;
-
-    /** Visibilité de la vue. */
-    private final int visibility;
-
-    /** Indique si la vue est enabled. */
-    private final boolean enabled;
+    /** Le marquage du nœud système (status bar, barre de navigation…). */
+    private final ViewType viewType;
 
     /**
-     * Construit une SystemViewInfo complète.
+     * Construit une info système par COPIE d'une info collectée, portant
+     * son marquage.
      *
-     * @param className  nom de la classe
-     * @param id         id de la vue
-     * @param left       position gauche
-     * @param top        position haute
-     * @param right      position droite
-     * @param bottom     position basse
-     * @param depth      profondeur
-     * @param visibility visibilité (VISIBLE / INVISIBLE / GONE)
-     * @param hasFocus   {@code true} si la vue a le focus
-     * @param focusable  {@code true} si la vue est focusable
-     * @param enabled    {@code true} si la vue est enabled
+     * @param source   l'info collectée (bounds dans l'espace du décor)
+     * @param viewType le marquage du nœud
      */
-    public SystemViewInfo(String className, int id,
-                          int left, int top, int right, int bottom, int depth,
-                          int visibility, boolean hasFocus, boolean focusable,
-                          boolean enabled) {
-        super(className, id, left, top, right, bottom, depth);
-        this.visibility = visibility;
-        this.hasFocus = hasFocus;
-        this.focusable = focusable;
-        this.enabled = enabled;
+    public SystemViewInfo(ViewInfoCollector.ViewInfo source, ViewType viewType) {
+        super(source.className, source.simpleName, source.id, source.idName,
+                source.left, source.top, source.right, source.bottom,
+                source.width, source.height,
+                source.paddingLeft, source.paddingTop, source.paddingRight, source.paddingBottom,
+                source.marginLeft, source.marginTop, source.marginRight, source.marginBottom,
+                source.visibility, source.depth, source.isViewGroup, source.children);
+        this.viewType = viewType == null ? ViewType.UNKNOWN : viewType;
     }
 
     /**
-     * @return la visibilité
+     * @return le marquage du nœud système
      */
-    public int getVisibility() {
-        return visibility;
-    }
-
-    /**
-     * @return {@code true} si la vue a le focus
-     */
-    public boolean hasFocus() {
-        return hasFocus;
-    }
-
-    /**
-     * @return {@code true} si la vue est focusable
-     */
-    public boolean isFocusable() {
-        return focusable;
-    }
-
-    /**
-     * @return {@code true} si la vue est enabled
-     */
-    public boolean isEnabled() {
-        return enabled;
-    }
-
-    /**
-     * @return {@code true} si la vue est visible
-     */
-    public boolean isVisible() {
-        return visibility == VISIBLE;
-    }
-
-    /**
-     * @return {@code true} si la vue est GONE
-     */
-    public boolean isGone() {
-        return visibility == GONE;
+    public ViewType getViewType() {
+        return viewType;
     }
 
     @Override
     public String toString() {
-        return super.toString() + " vis=" + visibility
-                + " focus=" + hasFocus + " enabled=" + enabled;
+        return super.toString() + " type=" + viewType;
     }
 }
