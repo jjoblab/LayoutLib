@@ -396,7 +396,8 @@ public class BridgeInflater {
         }
         // v3.4.0 — G8 : <fragment> n'est pas rendable en preview (les
         // fragments nécessitent un FragmentManager et un cycle de vie
-        // d'activité). On l'affiche comme un MockView ambre « Fragment
+        // d'activité). On l'affiche comme un MockView (v3.4.8 : cadre de
+        // remplacement pointillé, hachures et nom de classe) « Fragment
         // (not rendered) » au lieu d'aborter le rendu. Les fragments
         // modernes utilisent <androidx.fragment.app.FragmentContainerView>
         // (qui EST résolvable comme classe), donc ce case ne concerne
@@ -441,7 +442,8 @@ public class BridgeInflater {
         // car XmlPullAttributes ne peut pas être casté en XmlBlock.Parser sur Android 14+
         // Les attributs sont appliqués manuellement via AttributeApplier
         // ADR 0116 — P6/L10 : la Factory2 (hook AOSP) est consultée en premier
-        // v3.4.0 — G15 : try/catch sur createView, dégradation MockView ambre
+        // v3.4.0 — G15 : try/catch sur createView, dégradation MockView
+        // (v3.4.8 : cadre de remplacement miroir maquette)
         // au lieu d'abandonner tout le rendu (une vue custom qui lève ne
         // doit JAMAIS tuer la preview entière).
         View view = createViewSafely(tag, parent);
@@ -582,7 +584,7 @@ public class BridgeInflater {
      *
      * <p>Si {@link #onCreateViewFromFactory} lève (ClassNotFoundException,
      * NoSuchMethodException, InvocationTargetException, theme-enforcement
-     * IllegalArgumentException, etc.), on crée un {@link MockView} ambre à
+     * IllegalArgumentException, etc.), on crée un {@link MockView} à
      * la place. Le rendu continue — l'utilisateur voit un rectangle
      * « placeholder » là où la vue custom aurait dû être, au lieu d'une
      * page blanche avec un message d'erreur.</p>
@@ -621,7 +623,8 @@ public class BridgeInflater {
     /**
      * Journalise l'échec de création d'une vue — niveau WARNING, pas FINE,
      * car c'est un problème que l'utilisateur devrait voir (le placeholder
-     * ambre est silencieux dans le rendu, le log porte le diagnostic).
+     * de remplacement est silencieux dans le rendu, le log porte le
+     * diagnostic).
      */
     private void logViewCreationFailure(String tag, Throwable cause) {
         // La cause racine (cause chain) est plus utile que le message top-level
@@ -637,8 +640,9 @@ public class BridgeInflater {
 
     /**
      * Crée un {@link MockView} configuré avec le nom du tag original.
-     * Le MockView est ambre ({@code 0xFFFFC107}) pour être visible dans la
-     * preview. Sa taille par défaut est {@code wrap_content} pour ne pas
+     * Depuis v3.4.8 le MockView dessine le cadre de REMPLACEMENT de la
+     * maquette CodeIDE (contour pointillé, hachures, nom de classe) —
+     * lisible clair et nuit. Sa taille par défaut est {@code wrap_content} pour ne pas
      * casser le layout.
      */
     private View newMockView(String tag) {
@@ -887,7 +891,7 @@ public class BridgeInflater {
      * <p>On lit {@code android:layout}, on résout le layout (via le
      * {@code layoutProvider} si branché), et on l'inflate récursivement.
      * Si la résolution échoue (pas de provider, layout introuvable), on
-     * crée un MockView ambre « ViewStub: @layout/... » pour signaler
+     * crée un MockView « ViewStub: @layout/... » pour signaler
      * visuellement la présence du stub.</p>
      */
     private View parseViewStubEager(XmlPullParser parser, ViewGroup parent)
@@ -901,7 +905,7 @@ public class BridgeInflater {
         skipElement(parser);
 
         if (layoutRef == null) {
-            // ViewStub sans android:layout — placeholder ambre.
+            // ViewStub sans android:layout — placeholder de remplacement.
             View mock = newMockView("ViewStub (no layout)");
             if (parent != null) {
                 parent.addView(mock);
@@ -926,7 +930,7 @@ public class BridgeInflater {
                 stubParser.nextTag();
                 return parseElement(stubParser, parent);
             } catch (XmlPullParserException | IOException e) {
-                // Layout référencé invalide — MockView ambre.
+                // Layout référencé invalide — MockView de remplacement.
                 View mock = newMockView("ViewStub: @" + layoutName + " (invalid)");
                 if (parent != null) {
                     parent.addView(mock);
@@ -949,7 +953,7 @@ public class BridgeInflater {
      * <p>Les fragments nécessitent un {@code FragmentManager} et un cycle
      * de vie d'activité — ils ne peuvent pas être rendus en preview statique.
      * Au lieu d'aborter le rendu (comportement v3.3.0), on crée un
-     * {@link MockView} ambre et on skip les enfants du tag {@code <fragment>}.</p>
+     * {@link MockView} et on skip les enfants du tag {@code <fragment>}.</p>
      *
      * <p>Les fragments modernes utilisent
      * {@code <androidx.fragment.app.FragmentContainerView>} qui EST résolvable
