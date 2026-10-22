@@ -522,10 +522,34 @@ public class BridgeInflater {
 
         // Attachement au parent
         if (parent != null) {
-            parent.addView(view, lp);
+            attacherSansAbandonner(parent, view, lp, tag);
         }
 
         return view;
+    }
+
+    /**
+     * Attache la vue à son parent SANS faire échouer le rendu ENTIER quand
+     * le parent REFUSE l'ajout (v3.5.1 — étude PE14 § 3.3-C, S4 du plan) :
+     * {@code AdapterView.addView} lève {@code UnsupportedOperationException}
+     * pour TOUT enfant — la référence ISOLE la vue en échec
+     * ({@code Bridge.createMockView}) et rend LE RESTE ; ici le nœud fautif
+     * reste DÉTACHÉ (un AdapterView n'accepte AUCUN enfant) et JOURNALISÉ —
+     * l'éditeur signalant déjà le document par le problème
+     * ENFANTS_ADAPTATEUR côté CodeIDE.
+     *
+     * @param parent le parent visé
+     * @param view   la vue à attacher
+     * @param lp     les LayoutParams à poser
+     * @param nom    le nom de la balise, pour le journal
+     */
+    private void attacherSansAbandonner(ViewGroup parent, View view,
+                                         ViewGroup.LayoutParams lp, String nom) {
+        try {
+            parent.addView(view, lp);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "le parent refuse <" + nom + "> (AdapterView ?) : " + e.getMessage());
+        }
     }
 
     /**
@@ -1000,7 +1024,7 @@ public class BridgeInflater {
         }
 
         if (parent != null) {
-            parent.addView(view, lp);
+            attacherSansAbandonner(parent, view, lp, className);
         }
         return view;
     }
