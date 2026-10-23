@@ -75,6 +75,16 @@ public class ViewInfoCollector {
         public final boolean isViewGroup;
         public final List<ViewInfo> children;
 
+        /**
+         * Le VIEWCOOKIE de la vue (v3.7.0 — étude PE14 § 2.4-4, S8 — miroir
+         * du cookie {@code ViewInfo} de la référence) : l'identité du NŒUD
+         * XML SOURCE (« site:ordinal » posée par {@link BridgeInflater}),
+         * {@code null} quand le collecteur ne reçoit PAS de résolveur
+         * (comportement d'avant v3.7.0, compat) ou que la vue n'en porte
+         * pas (rangée d'adapter, chrome système).
+         */
+        public final String viewCookie;
+
         public ViewInfo(String className, String simpleName, int id, String idName,
                         int left, int top, int right, int bottom,
                         int width, int height,
@@ -82,6 +92,23 @@ public class ViewInfoCollector {
                         int marginLeft, int marginTop, int marginRight, int marginBottom,
                         int visibility, int depth, boolean isViewGroup,
                         List<ViewInfo> children) {
+            this(className, simpleName, id, idName, left, top, right, bottom,
+                    width, height, paddingLeft, paddingTop, paddingRight, paddingBottom,
+                    marginLeft, marginTop, marginRight, marginBottom,
+                    visibility, depth, isViewGroup, children, null);
+        }
+
+        /**
+         * Le constructeur COMPLET (v3.7.0 — le cookie de nœud source se
+         * pose à la construction, jamais après : un ViewInfo est IMMUTABLE).
+         */
+        public ViewInfo(String className, String simpleName, int id, String idName,
+                        int left, int top, int right, int bottom,
+                        int width, int height,
+                        int paddingLeft, int paddingTop, int paddingRight, int paddingBottom,
+                        int marginLeft, int marginTop, int marginRight, int marginBottom,
+                        int visibility, int depth, boolean isViewGroup,
+                        List<ViewInfo> children, String viewCookie) {
             this.className = className;
             this.simpleName = simpleName;
             this.id = id;
@@ -104,6 +131,7 @@ public class ViewInfoCollector {
             this.depth = depth;
             this.isViewGroup = isViewGroup;
             this.children = children;
+            this.viewCookie = viewCookie;
         }
 
         public boolean isVisible() {
@@ -167,7 +195,21 @@ public class ViewInfoCollector {
      * @return les ViewInfo de la racine
      */
     public static ViewInfo collect(View rootView) {
-        return collectInternal(rootView, 0, null, 0, 0);
+        return collect(rootView, null);
+    }
+
+    /**
+     * Collecte la hiérarchie complète d'une vue racine, AVEC les
+     * VIEWCOOKIES (v3.7.0 — étude PE14 § 2.4-4, S8).
+     *
+     * @param rootView la vue racine (déjà mesurée et positionnée)
+     * @param cookies   les cookies posés par
+     *                  {@link BridgeInflater#getViewCookies()} au rendu
+     *                  (null = comportement sans cookie, compat)
+     * @return les ViewInfo de la racine (cookie de nœud source posé)
+     */
+    public static ViewInfo collect(View rootView, java.util.Map<View, String> cookies) {
+        return collectInternal(rootView, 0, null, 0, 0, cookies);
     }
 
     /**
@@ -189,15 +231,34 @@ public class ViewInfoCollector {
      */
     public static CollecteDecor collectDecor(View decor, View racineContenu,
                                              InsetsDecor insets, ModePlacementDecor modePlacement) {
+        return collectDecor(decor, racineContenu, insets, modePlacement, null);
+    }
+
+    /**
+     * La COLLECTE DUALE AVEC COOKIES (v3.7.0 — S8) : chaque
+     * {@code ViewInfo} du CONTENU porte l'identité de son NŒUD XML SOURCE
+     * (le décor reste sans cookie — il n'a pas de nœud document).
+     *
+     * @param decor         la racine du décor (ou le contenu lui-même sans chrome)
+     * @param racineContenu la racine du layout UTILISATEUR dans le décor
+     * @param insets        les insets du décor (calculés par le chrome)
+     * @param modePlacement le mode de placement du contenu
+     * @param cookies       les cookies de {@link BridgeInflater#getViewCookies()}
+     *                       (null = comportement sans cookie, compat)
+     * @return la collecte duale (contenu bitmap + décor marqué)
+     */
+    public static CollecteDecor collectDecor(View decor, View racineContenu,
+                                             InsetsDecor insets, ModePlacementDecor modePlacement,
+                                             java.util.Map<View, String> cookies) {
         InsetsDecor insetsSur = insets == null ? InsetsDecor.aucun() : insets;
         ModePlacementDecor modeSur =
                 modePlacement == null ? ModePlacementDecor.PADDE_PAR_DEFAUT : modePlacement;
         if (decor == racineContenu || racineContenu == null) {
-            return new CollecteDecor(collectInternal(decor, 0, null, 0, 0),
+            return new CollecteDecor(collectInternal(decor, 0, null, 0, 0, cookies),
                     null, insetsSur, modeSur);
         }
         int[] offset = offsetDansDecor(racineContenu);
-        ViewInfo contenu = collectInternal(racineContenu, 0, null, offset[0], offset[1]);
+        ViewInfo contenu = collectInternal(racineContenu, 0, null, offset[0], offset[1], cookies);
         SystemViewInfo systeme = collectSystemNode(decor, racineContenu, 0, null, 0, 0);
         return new CollecteDecor(contenu, systeme, insetsSur, modeSur);
     }
@@ -213,7 +274,8 @@ public class ViewInfoCollector {
      * @return les ViewInfo
      */
     private static ViewInfo collectInternal(View view, int depth, ViewGroup parent,
-                                            int offsetX, int offsetY) {
+                                            int offsetX, int offsetY,
+                                            java.util.Map<View, String> cookies) {
         if (view == null) return null;
 
         int absLeft   = view.getLeft()   + offsetX;
@@ -233,14 +295,15 @@ public class ViewInfoCollector {
             ViewGroup group = (ViewGroup) view;
             for (int i = 0; i < group.getChildCount(); i++) {
                 ViewInfo child = collectInternal(group.getChildAt(i), depth + 1, group,
-                        absLeft, absTop);
+                        absLeft, absTop, cookies);
                 if (child != null) {
                     children.add(child);
                 }
             }
         }
 
-        return snapshot(view, depth, parent, offsetX, offsetY, children, isViewGroup);
+        return snapshot(view, depth, parent, offsetX, offsetY, children, isViewGroup,
+                cookies == null ? null : cookies.get(view));
     }
 
     /**
@@ -261,6 +324,18 @@ public class ViewInfoCollector {
     private static ViewInfo snapshot(View view, int depth, ViewGroup parent,
                                      int offsetX, int offsetY,
                                      List<ViewInfo> children, boolean isViewGroup) {
+        return snapshot(view, depth, parent, offsetX, offsetY, children, isViewGroup, null);
+    }
+
+    /**
+     * Le SNAPSHOT d'UN nœud (v3.7.0 — avec le VIEWCOOKIE de la vue) :
+     * bounds absolues au {@code (offsetX, offsetY)} cumulé, marges lues
+     * du parent, identité du NŒUD XML SOURCE quand le résolveur la connaît.
+     */
+    private static ViewInfo snapshot(View view, int depth, ViewGroup parent,
+                                     int offsetX, int offsetY,
+                                     List<ViewInfo> children, boolean isViewGroup,
+                                     String viewCookie) {
         String className = view.getClass().getName();
         String simpleName = view.getClass().getSimpleName();
         int id = view.getId();
@@ -298,7 +373,7 @@ public class ViewInfoCollector {
                 view.getPaddingLeft(), view.getPaddingTop(),
                 view.getPaddingRight(), view.getPaddingBottom(),
                 marginLeft, marginTop, marginRight, marginBottom,
-                view.getVisibility(), depth, isViewGroup, children);
+                view.getVisibility(), depth, isViewGroup, children, viewCookie);
     }
 
     /**

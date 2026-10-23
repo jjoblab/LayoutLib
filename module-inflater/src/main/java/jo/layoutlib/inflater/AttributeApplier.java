@@ -273,15 +273,35 @@ public final class AttributeApplier {
         int pl = 0, pt = 0, pr = 0, pb = 0;
         if (padding != null) { int p = parseDim(padding); pl = pr = pt = pb = p; }
         if (paddingLeft != null) pl = parseDim(paddingLeft);
-        else if (paddingStart != null) pl = parseDim(paddingStart);
         if (paddingTop != null) pt = parseDim(paddingTop);
         if (paddingRight != null) pr = parseDim(paddingRight);
-        else if (paddingEnd != null) pr = parseDim(paddingEnd);
         if (paddingBottom != null) pb = parseDim(paddingBottom);
         if (padding != null || paddingLeft != null || paddingTop != null
                 || paddingRight != null || paddingBottom != null
                 || paddingStart != null || paddingEnd != null) {
-            view.setPadding(pl, pt, pr, pb);
+            if (paddingStart != null || paddingEnd != null) {
+                // v3.7.0 — S8 (étude PE14 § 2.4-5) : paddings RELATIFS — la
+                // destruction du préprocesseur est retirée, start/end sont
+                // posés en RELATIF (miroir de la lecture AOSP) ; le côté
+                // RELATIF absent retombe sur l'ABSOLU du même côté.
+                int relStart = paddingStart != null ? parseDim(paddingStart) : pl;
+                int relEnd = paddingEnd != null ? parseDim(paddingEnd) : pr;
+                view.setPaddingRelative(relStart, pt, relEnd, pb);
+            } else {
+                view.setPadding(pl, pt, pr, pb);
+            }
+        }
+
+        // v3.7.0 — S8 : android:layoutDirection PAR VUE (la direction
+        // RÉSOLUE reste au framework ; DirectionRendu fait la passe de
+        // résolution à la fin de l'inflation).
+        String layoutDirection = getAttr(parser, "layoutDirection");
+        if (layoutDirection != null) {
+            try {
+                view.setLayoutDirection(DirectionRendu.directionDepuisValeur(layoutDirection));
+            } catch (RuntimeException e) {
+                logAttrError("layoutDirection", e);
+            }
         }
 
         String enabled = getAttr(parser, "enabled");

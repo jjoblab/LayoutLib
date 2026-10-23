@@ -13,6 +13,12 @@
 # par includeBuild + substitution, plus de JitPack).
 agp = "9.4.1"
 
+# v3.7.0 — S9 (étude PE14 § 5.4) : Compose C0, le SPIKE. Kotlin aligné sur
+# CodeIDE (2.2.10 — démon/caches partagés) ; le plugin compose est porté PAR
+# Kotlin depuis 2.0 (même version) ; le BOM est la dernière stable Google Maven.
+kotlin = "2.2.10"
+composeBom = "2026.09.00"
+
 # AndroidX / Material — versions partagées avec CodeIDE
 # (gradle/libs.versions.toml de CodeIDE = source de vérité).
 androidxAnnotation = "1.10.0"
@@ -62,6 +68,13 @@ androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "a
 androidx-recyclerview = { module = "androidx.recyclerview:recyclerview", version.ref = "androidxRecyclerview" }
 androidx-constraintlayout = { module = "androidx.constraintlayout:constraintlayout", version.ref = "androidxConstraintlayout" }
 material = { module = "com.google.android.material:material", version.ref = "material" }
+
+# v3.7.0 — S9 (Compose C0) : le runtime Compose EMBARQUÉ dans le harnais de
+# spike (miroir PC1 : le pack preview l'embarquera pour :preview). Les
+# versions viennent TOUTES du BOM — jamais de version directe.
+compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
+compose-ui = { module = "androidx.compose.ui:ui" }
+compose-material3 = { module = "androidx.compose.material3:material3" }
 androidx-viewpager = { module = "androidx.viewpager:viewpager", version.ref = "androidxViewpager" }
 androidx-viewpager2 = { module = "androidx.viewpager2:viewpager2", version.ref = "androidxViewpager2" }
 androidx-cardview = { module = "androidx.cardview:cardview", version.ref = "androidxCardview" }

@@ -30,14 +30,22 @@ import java.util.regex.Pattern;
  *       l'URI <em>tools</em>), la déclaration {@code xmlns:tools} est
  *       conservée AVANT CEUX-CI pour que le parseur noms-espace les
  *       accepte — miroir du {@code TOOLS_URI} de la référence.</li>
- *   <li>Conversion de {@code layout_marginStart} en {@code layout_marginLeft}
- *       et {@code layout_marginEnd} en {@code layout_marginRight} pour
- *       assurer la compatibilité avec l'API de layout historique.</li>
- *   <li>Conversion de {@code paddingStart} en {@code paddingLeft} et
- *       {@code paddingEnd} en {@code paddingRight} pour la même raison.</li>
- *   <li>Conversion de {@code layout_marginHorizontal} en
- *       {@code layout_marginLeft} + {@code layout_marginRight}.</li>
+ *   <li>Préservation des attributs RELATIFS (v3.7.0 — étude PE14
+ *       § 2.4-5, S8) : {@code layout_marginStart/End} et
+ *       {@code paddingStart/End} traversent INTACTS — voir la note RTL
+ *       ci-dessous.</li>
  * </ul>
+ *
+ * <p><strong>RETIRÉ v3.7.0 (étude PE14 § 2.4-5, S8) — RTL :</strong> les
+ * conversions {@code *Start} → {@code *Left} / {@code *End} → {@code *Right}
+ * ont été SUPPRIMÉES : elles détruisaient la sémantique relative des
+ * layouts RTL ({@code layout_marginStart} est la marge de DÉPART, pas de
+ * gauche). Les attributs {@code layout_marginStart/End} et
+ * {@code paddingStart/End} survivent INTACTS jusqu'au parser —
+ * {@link BridgeInflater} les pose en RELATIF ({@code setMarginStart},
+ * {@code setPaddingRelative}) et {@link DirectionRendu} résout la
+ * direction au rendu (miroir {@code LayoutDirectionQualifier} de la
+ * référence : le VRAI framework fait la traduction).</p>
  *
  * <p>Le préprocesseur ne modifie pas la structure arborescente du XML : il se
  * contente de transformations lexicales. Il préserve les commentaires et le
@@ -69,22 +77,6 @@ public final class XmlPreprocessor {
     private static final Pattern XMLNS_TOOLS_PATTERN =
             Pattern.compile("\\s+xmlns:tools=\"http://schemas\\.android\\.com/tools\"");
 
-    /** Pattern pour layout_marginStart → layout_marginLeft. */
-    private static final Pattern MARGIN_START_PATTERN =
-            Pattern.compile("layout_marginStart\\s*=\\s*\"([^\"]*)\"");
-
-    /** Pattern pour layout_marginEnd → layout_marginRight. */
-    private static final Pattern MARGIN_END_PATTERN =
-            Pattern.compile("layout_marginEnd\\s*=\\s*\"([^\"]*)\"");
-
-    /** Pattern pour paddingStart → paddingLeft. */
-    private static final Pattern PADDING_START_PATTERN =
-            Pattern.compile("paddingStart\\s*=\\s*\"([^\"]*)\"");
-
-    /** Pattern pour paddingEnd → paddingRight. */
-    private static final Pattern PADDING_END_PATTERN =
-            Pattern.compile("paddingEnd\\s*=\\s*\"([^\"]*)\"");
-
     /**
      * Constructeur privé : la classe n'est pas instanciable, elle ne fournit
      * que des méthodes statiques.
@@ -114,10 +106,9 @@ public final class XmlPreprocessor {
         // v3.6.0 — la déclaration xmlns:tools ne part que si PLUS AUCUN
         // attribut tools: ne survit (sinon « Undefined Prefix: tools »).
         result = stripXmlnsTools(result);
-        result = convertMarginStart(result);
-        result = convertMarginEnd(result);
-        result = convertPaddingStart(result);
-        result = convertPaddingEnd(result);
+        // v3.7.0 — PLUS de conversion *Start/*End → *Left/*Right : les
+        // attributs RELATIFS survivent intacts (étude PE14 § 2.4-5) —
+        // BridgeInflater les pose en relatif, DirectionRendu résout.
         return result;
     }
 
@@ -167,46 +158,6 @@ public final class XmlPreprocessor {
      */
     private static String stripRemainingToolsAttributes(String xml) {
         return TOOLS_ATTR_STRIP_PATTERN.matcher(xml).replaceAll("");
-    }
-
-    /**
-     * Convertit {@code layout_marginStart} en {@code layout_marginLeft}.
-     *
-     * @param xml le XML source
-     * @return le XML converti
-     */
-    private static String convertMarginStart(String xml) {
-        return MARGIN_START_PATTERN.matcher(xml).replaceAll("layout_marginLeft=\"$1\"");
-    }
-
-    /**
-     * Convertit {@code layout_marginEnd} en {@code layout_marginRight}.
-     *
-     * @param xml le XML source
-     * @return le XML converti
-     */
-    private static String convertMarginEnd(String xml) {
-        return MARGIN_END_PATTERN.matcher(xml).replaceAll("layout_marginRight=\"$1\"");
-    }
-
-    /**
-     * Convertit {@code paddingStart} en {@code paddingLeft}.
-     *
-     * @param xml le XML source
-     * @return le XML converti
-     */
-    private static String convertPaddingStart(String xml) {
-        return PADDING_START_PATTERN.matcher(xml).replaceAll("paddingLeft=\"$1\"");
-    }
-
-    /**
-     * Convertit {@code paddingEnd} en {@code paddingRight}.
-     *
-     * @param xml le XML source
-     * @return le XML converti
-     */
-    private static String convertPaddingEnd(String xml) {
-        return PADDING_END_PATTERN.matcher(xml).replaceAll("paddingRight=\"$1\"");
     }
 
     /**

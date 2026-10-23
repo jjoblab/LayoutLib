@@ -16,8 +16,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *
  * <p>Ces tests valident les transformations lexicales appliquées avant le
  * parsing : suppression de {@code xmlns:tools}, conversion des attributs
- * {@code tools:*}, conversion RTL ({@code *Start} → {@code *Left},
- * {@code *End} → {@code *Right}).</p>
+ * {@code tools:*}, PRÉSERVATION des attributs relatifs RTL
+ * ({@code *Start}/{@code *End} survivent intacts — v3.7.0, étude PE14
+ * § 2.4-5 : la destruction RTL est RETIRÉE).</p>
  *
  * @author jo@Dev
  */
@@ -87,41 +88,50 @@ class XmlPreprocessorTest {
     }
 
     @Nested
-    @DisplayName("Conversion RTL → LTR")
-    class ConvertRtl {
+    @DisplayName("Préservation des attributs relatifs RTL (v3.7.0 — S8)")
+    class PreserveRtl {
+
+        // Avant v3.7.0, le préprocesseur convertissait layout_marginStart →
+        // layout_marginLeft : un layout RTL perdait sa sémantique (la marge
+        // de DÉPART n'est pas la marge de GAUCHE — étude PE14 § 2.4-5).
+        // Désormais les attributs RELATIFS traversent INTACTS jusqu'au
+        // parser : BridgeInflater les pose via setMarginStart/
+        // setMarginEnd et DirectionRendu résout la direction au rendu.
 
         @Test
-        @DisplayName("convertit layout_marginStart → layout_marginLeft")
-        void shouldConvertMarginStart() {
+        @DisplayName("préserve layout_marginStart tel quel")
+        void shouldPreserveMarginStart() {
             String xml = "<View layout_marginStart=\"16dp\"/>";
             String result = XmlPreprocessor.preprocess(xml);
-            assertThat(result).contains("layout_marginLeft=\"16dp\"");
-            assertThat(result).doesNotContain("layout_marginStart");
+            assertThat(result).contains("layout_marginStart=\"16dp\"");
+            assertThat(result).doesNotContain("layout_marginLeft");
         }
 
         @Test
-        @DisplayName("convertit layout_marginEnd → layout_marginRight")
-        void shouldConvertMarginEnd() {
+        @DisplayName("préserve layout_marginEnd tel quel")
+        void shouldPreserveMarginEnd() {
             String xml = "<View layout_marginEnd=\"8dp\"/>";
             String result = XmlPreprocessor.preprocess(xml);
-            assertThat(result).contains("layout_marginRight=\"8dp\"");
-            assertThat(result).doesNotContain("layout_marginEnd");
+            assertThat(result).contains("layout_marginEnd=\"8dp\"");
+            assertThat(result).doesNotContain("layout_marginRight");
         }
 
         @Test
-        @DisplayName("convertit paddingStart → paddingLeft")
-        void shouldConvertPaddingStart() {
+        @DisplayName("préserve paddingStart tel quel")
+        void shouldPreservePaddingStart() {
             String xml = "<View paddingStart=\"4dp\"/>";
             String result = XmlPreprocessor.preprocess(xml);
-            assertThat(result).contains("paddingLeft=\"4dp\"");
+            assertThat(result).contains("paddingStart=\"4dp\"");
+            assertThat(result).doesNotContain("paddingLeft");
         }
 
         @Test
-        @DisplayName("convertit paddingEnd → paddingRight")
-        void shouldConvertPaddingEnd() {
+        @DisplayName("préserve paddingEnd tel quel")
+        void shouldPreservePaddingEnd() {
             String xml = "<View paddingEnd=\"4dp\"/>";
             String result = XmlPreprocessor.preprocess(xml);
-            assertThat(result).contains("paddingRight=\"4dp\"");
+            assertThat(result).contains("paddingEnd=\"4dp\"");
+            assertThat(result).doesNotContain("paddingRight");
         }
     }
 

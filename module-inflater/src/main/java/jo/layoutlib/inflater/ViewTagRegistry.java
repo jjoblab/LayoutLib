@@ -80,11 +80,13 @@ public final class ViewTagRegistry {
     }
 
     /**
-     * Construit un registre par défaut qui privilégie les classes Design.
-     * Équivalent à {@code new ViewTagRegistry(true)}.
+     * Construit un registre par défaut — SANS les classes Design
+     * (v3.7.0 — S8, étude PE14 § 2.5 : le paquet {@code jo.layoutlib.design.*}
+     * n'a JAMAIS existé, le mode « préférer » ne menait qu'au repli
+     * MockView). Équivalent à {@code new ViewTagRegistry(false)}.
      */
     public ViewTagRegistry() {
-        this(true);
+        this(false);
     }
 
     /**

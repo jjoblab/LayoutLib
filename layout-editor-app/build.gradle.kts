@@ -58,6 +58,11 @@ dependencies {
     implementation(project(":module-attributes"))
     implementation(project(":module-layout"))
 
+    // v3.7.0 — S9 (étude PE14 § 5.4) : le SPIKE Compose C0 — le runtime
+    // Compose EMBARQUÉ arrive par ce module (miroir PC1), avec son
+    // harnais d'activité (manifeste fusionné : ActiviteComposeC0).
+    implementation(project(":module-compose"))
+
     // code-editor (github.com/jjoblab/code-editor) — EditorView + EditorSession.
     // Dépôt multi-modules : JitPack publie sous com.github.jjoblab.code-editor.
     // cel-ui expose cel-core et cel-lsp-api en `api` (transitif).

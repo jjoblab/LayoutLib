@@ -4,6 +4,7 @@ import android.content.Context;
 import android.view.View;
 
 import jo.layoutlib.resources.ResourceResolver;
+import jo.layoutlib.resources.ResourceResolverImpl;
 
 /**
  * Façade publique du mini-layoutlib.
@@ -71,18 +72,22 @@ public class MiniLayoutLib {
     }
 
     /**
-     * Configure le dossier de resources du projet à utiliser pour résoudre
+     * Configure le dossier de resources du projet à résoudre
      * {@code @color/}, {@code @string/}, {@code @dimen/}, {@code @drawable/},
      * {@code @layout/}, etc.
+     *
+     * <p>v3.7.0 — S8 (étude PE14 § 2.5, hygiène) : la méthode n'est PLUS
+     * une coquille — le module-resources est PRÊT depuis v2.x, elle
+     * construit un {@code ResourceResolverImpl} du dossier {@code res/}
+     * et le pose sur l'inflater (miroir de {@link #setResourceResolver},
+     * jamais de retour silencieux : un dossier illisible lève comme
+     * l'ancien {@code new ResourceResolverImpl(resFolder)}).</p>
      *
      * @param resFolderAbsolutePath chemin absolu vers le dossier {@code res/}
      * @return cette instance (chaînage)
      */
     public MiniLayoutLib setProjectResources(String resFolderAbsolutePath) {
-        // Délègue au module-resources (à brancher quand le module sera prêt)
-        // resourceResolver = new ResourceResolver(resFolderAbsolutePath);
-        // inflater.setResourceResolver(resourceResolver);
-        return this;
+        return setResourceResolver(new ResourceResolverImpl(resFolderAbsolutePath));
     }
 
     /**

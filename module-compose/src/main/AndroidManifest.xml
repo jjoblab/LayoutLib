@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  v3.7.0 — S9 (Compose C0, étude § 5.4) : le HARNAIS du spike vit dans ce
+  module (le runtime Compose y est embarqué, miroir PC1) ; l'activité se
+  lance depuis l'app démo par :
+  adb shell am start -n jo.layoutlib.editor/jo.layoutlib.compose.ActiviteComposeC0
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity
+            android:name="jo.layoutlib.compose.ActiviteComposeC0"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.LayoutEditor" />
+    </application>
+</manifest>

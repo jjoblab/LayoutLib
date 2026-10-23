@@ -136,16 +136,66 @@ public class BridgeInflater {
      *  (ADR 0116 — P6/L11, introspection/tests). */
     private int layoutTransitionCount = 0;
 
+    /**
+     * Le QUALIFICATEUR de direction de rendu (v3.7.0 — étude PE14 § 2.4-5,
+     * S8) : {@link DirectionRendu#INDEFINI} par défaut (le framework seul
+     * décide), sinon posé sur la RACINE à chaque inflation — les enfants
+     * héritent ({@code LAYOUT_DIRECTION_INHERIT}), les marges relatives
+     * {@code start}/{@code end} se résolvent par
+     * {@link DirectionRendu#appliquer(View, int)}.
+     */
+    private int layoutDirectionRendu = DirectionRendu.INDEFINI;
+
+    /**
+     * Le VIEWCOOKIE de chaque vue inflatée (v3.7.0 — étude PE14 § 2.4-4,
+     * S8 — miroir du cookie {@code ViewInfo} de la référence) : l'identité
+     * du NŒUD XML SOURCE — « site:ordinal », l'ordinal étant le rang du
+     * START_TAG dans la marche du document, le site la CHAÎNE des
+     * {@code <include>} traversés. Fiabilise sélection/surlignage : deux
+     * vues identiques de nœuds DIFFÉRENTS (même layout inclus DEUX fois)
+     * portent des cookies DISTINCTS, et un écart de COMPTE (include
+     * résolu nativement, ViewStub, adapter) ne désarme PLUS la suite —
+     * l'appariement se fait par IDENTITÉ, pas par position.
+     *
+     * <p>Vit sur l'inflater RACINE (les enfants de {@code <include>} et de
+     * l'aperçu de listes héritent du MÊME registre par
+     * {@link #registreViewCookies}) ; {@link java.util.ref.WeakHashMap} —
+     * les vues d'un rendu précédent partent avec elles.</p>
+     */
+    private final java.util.Map<View, String> viewCookies =
+            new java.util.WeakHashMap<>();
+
+    /**
+     * Le registre PARTAGÉ des cookies (l'inflater RACINE pointe sa propre
+     * map ; les inflaters ENFANTS — {@code <include>}, rangées d'aperçu —
+     * pointent celle de la RACINE pour que TOUTES les vues d'un rendu
+     * vivent au même endroit).
+     */
+    private java.util.Map<View, String> registreViewCookies = viewCookies;
+
+    /** Le SITE cookie courant (chaîne des {@code <include>} traversés, "" = document principal). */
+    private String siteCookies = "";
+
+    /** Le compteur d'ordinaux du document courant (rang du START_TAG, 0-based). */
+    private int ordinalNoeud = 0;
+
     /** Registre d'attributs (module-attributes) pour le mode strict. */
     private jo.layoutlib.attributes.AttributeRegistry attributeRegistry;
 
     /**
-     * Construit un inflater par défaut avec les classes Design préférées.
+     * Construit un inflater par défaut.
+     *
+     * <p>v3.7.0 — S8 (étude PE14 § 2.5, hygiène) : le registre par défaut
+     * ne cherche PLUS les classes « Design » ({@code jo.layoutlib.design.*})
+     * — ce paquet n'a JAMAIS existé dans le dépôt et le mode
+     * {@code preferDesignClasses} faisait partir TOUT tag court vers
+     * MockView (le piège documenté par l'étude). Les classes VRAIES sont
+     * les natives du framework + AndroidX/Material embarqués (v3.4.9).</p>
      *
      * @param context contexte Android
      */
     public BridgeInflater(Context context) {
-        this(context, new ViewTagRegistry(true));
+        this(context, new ViewTagRegistry(false));
     }
 
     /**
@@ -362,11 +412,38 @@ public class BridgeInflater {
 
         try {
             XmlPullParser parser = XmlPreprocessor.createParser(normalized);
-            return parseRoot(parser, parent);
+            View racine = parseRoot(parser, parent);
+            // v3.7.0 — S8 (étude PE14 § 2.4-5) : qualificateur de DIRECTION
+            // sur la racine puis RÉSOLUTION des marges relatives de tout
+            // l'arbre (la passe que l'attachement d'une fenêtre ferait —
+            // le rendu hors fenêtre doit la faire lui-même).
+            DirectionRendu.appliquer(racine, layoutDirectionRendu);
+            return racine;
         } catch (XmlPullParserException | IOException e) {
             throw new InflateException(
                     "Erreur pendant l'inflation : " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Le QUALIFICATEUR de direction de rendu (v3.7.0 — S8, miroir du
+     * {@code LayoutDirectionQualifier} de la référence).
+     *
+     * @param direction {@link View#LAYOUT_DIRECTION_LTR},
+     *                   {@link View#LAYOUT_DIRECTION_RTL} ou
+     *                   {@link DirectionRendu#INDEFINI} (ne rien poser — le
+     *                   framework suit la locale du contexte)
+     */
+    public void setLayoutDirectionRendu(int direction) {
+        this.layoutDirectionRendu = direction;
+    }
+
+    /**
+     * @return le qualificateur de direction courant
+     *         ({@link DirectionRendu#INDEFINI} par défaut)
+     */
+    public int getLayoutDirectionRendu() {
+        return layoutDirectionRendu;
     }
 
     /**
@@ -400,16 +477,52 @@ public class BridgeInflater {
      * standards. Pour les tags {@code <include>} et {@code <merge>}, elle
      * délègue aux méthodes dédiées.</p>
      *
+     * <p>v3.7.0 — VIEWCOOKIE (étude PE14 § 2.4-4, S8) : chaque appel
+     * consomme UN ORDINAL (le rang du START_TAG dans la marche du
+     * document) et toute vue PRODUITE reçoit
+     * {@link #poserCookie(View, int, String)} — l'identité du nœud XML
+     * source, miroir du cookie {@code ViewInfo} de la référence. La vue
+     * gonflée d'un {@code <ViewStub>} porte l'ordinal du TAG stub, ses
+     * descendants vivent dans un SITE BRANCHÉ (pas de collision avec les
+     * frères qui suivent).</p>
+     *
      * @param parser le parser positionné sur un START_TAG
      * @param parent le parent (peut être {@code null})
      * @return la vue créée, ou {@code null} pour {@code <merge>}
      */
     private View parseElement(XmlPullParser parser, ViewGroup parent)
             throws XmlPullParserException, IOException {
+        int ordinal = ordinalNoeud++;
+        String tag = parser.getName();
+        View vue = parseElementInterne(parser, parent, ordinal);
+        // v3.7.0 — VIEWCOOKIE : la vue créée PAR CET ÉLÉMENT porte son
+        // ordinal — SAUF les retours « EMPRUNTÉS » (<include> et <layout>
+        // data-binding renvoient la vue d'un AUTRE nœud, déjà cookieée
+        // par sa propre marche). Le <ViewStub> pose DEUX fois :
+        // « site:ordinal » à l'intérieur, l'ordinal du TAG stub EN DERNIER
+        // (sélectionner le tag stub sélectionne la racine gonflée).
+        if (vue != null && !"include".equals(tag) && !"layout".equals(tag)) {
+            poserCookie(vue, ordinal, siteCookies);
+        }
+        return vue;
+    }
+
+    /**
+     * Le corps historique de {@link #parseElement} — SANS le compteur de
+     * cookie (v3.7.0 : l'ordinal appartient à l'ÉLÉMENT, pas au corps).
+     *
+     * @param parser le parser positionné sur un START_TAG
+     * @param parent le parent (peut être {@code null})
+     * @param ordinal l'ordinal du START_TAG (site branché des tags qui
+     *                gonflent un AUTRE document : ViewStub, data-binding)
+     * @return la vue créée, ou {@code null}
+     */
+    private View parseElementInterne(XmlPullParser parser, ViewGroup parent, int ordinal)
+            throws XmlPullParserException, IOException {
         String tag = parser.getName();
 
         if ("include".equals(tag)) {
-            return parseInclude(parser, parent);
+            return parseInclude(parser, parent, ordinal);
         }
         if ("merge".equals(tag)) {
             parseMerge(parser, parent);
@@ -465,7 +578,7 @@ public class BridgeInflater {
         // pour que l'utilisateur voie ce qui apparaîtra — Android Studio
         // fait de même.
         if ("ViewStub".equals(tag)) {
-            return parseViewStubEager(parser, parent);
+            return parseViewStubEager(parser, parent, ordinal);
         }
 
         // Cas standard : création d'une vue
@@ -1169,7 +1282,7 @@ public class BridgeInflater {
      * @param parent le ViewGroup auquel attacher les enfants inclus
      * @return la première vue incluse, ou {@code null} pour un {@code <merge>}
      */
-    private View parseInclude(XmlPullParser parser, ViewGroup parent)
+    private View parseInclude(XmlPullParser parser, ViewGroup parent, int ordinal)
             throws XmlPullParserException, IOException {
         if (parent == null) {
             throw new InflateException(
@@ -1203,6 +1316,11 @@ public class BridgeInflater {
 
         // Inflater récursivement le layout inclus
         BridgeInflater childInflater = creerInflaterEnfant();
+        // v3.7.0 — VIEWCOOKIE : le document inclus vit dans un SITE
+        // BRANCHÉ — la chaîne des ordinaux d'{@code <include>} — les vues
+        // de DEUX inclusions du MÊME fichier portent des cookies DISTINCTS
+        // (miroir du {@code MergeCookie} de la référence).
+        childInflater.setContexteCookie(siteDe(ordinal), registreViewCookies);
         View firstChild = childInflater.inflate(includedXml, parent);
         // Les compteurs d'introspection (P6/L10-L11) remontent au inflater
         // parent — les <include> ne créent pas de trous de comptage
@@ -1384,7 +1502,7 @@ public class BridgeInflater {
      * crée un MockView « ViewStub: @layout/... » pour signaler
      * visuellement la présence du stub.</p>
      */
-    private View parseViewStubEager(XmlPullParser parser, ViewGroup parent)
+    private View parseViewStubEager(XmlPullParser parser, ViewGroup parent, int ordinal)
             throws XmlPullParserException, IOException {
         String layoutRef = getAttributeValue(parser, "android", "layout");
         if (layoutRef == null) {
@@ -1414,11 +1532,25 @@ public class BridgeInflater {
         }
 
         if (layoutXml != null) {
-            // Inflation eager du layout référencé.
+            // Inflation eager du layout référencé — v3.7.0 VIEWCOOKIE : le
+            // document du stub vit dans un SITE BRANCHÉ (les ordinaux de
+            // ses nœuds ne COLLISIONNENT pas avec ceux des frères qui
+            // suivent le stub) ; la vue RACINE du layout garde l'ordinal
+            // DU TAG STUB (posée en dernier par le wrapper — sélectionner
+            // le tag stub sélectionne la racine gonflée, miroir AS).
             try {
                 XmlPullParser stubParser = XmlPreprocessor.createParser(layoutXml);
                 stubParser.nextTag();
-                return parseElement(stubParser, parent);
+                String siteSauve = siteCookies;
+                int ordinalSauve = ordinalNoeud;
+                siteCookies = siteDe(ordinal);
+                ordinalNoeud = 0;
+                try {
+                    return parseElement(stubParser, parent);
+                } finally {
+                    siteCookies = siteSauve;
+                    ordinalNoeud = ordinalSauve;
+                }
             } catch (XmlPullParserException | IOException e) {
                 // Layout référencé invalide — MockView de remplacement.
                 View mock = newMockView("ViewStub: @" + layoutName + " (invalid)");
@@ -1679,17 +1811,42 @@ public class BridgeInflater {
                 int m = parseDimension(margin);
                 mlp.setMargins(m, m, m, m);
             } else {
-                int ml = marginLeft != null ? parseDimension(marginLeft) :
-                        (marginStart != null ? parseDimension(marginStart) : mlp.leftMargin);
+                int ml = marginLeft != null ? parseDimension(marginLeft) : mlp.leftMargin;
                 int mt = marginTop != null ? parseDimension(marginTop) : mlp.topMargin;
-                int mr = marginRight != null ? parseDimension(marginRight) :
-                        (marginEnd != null ? parseDimension(marginEnd) : mlp.rightMargin);
+                int mr = marginRight != null ? parseDimension(marginRight) : mlp.rightMargin;
                 int mb = marginBottom != null ? parseDimension(marginBottom) : mlp.bottomMargin;
                 mlp.setMargins(ml, mt, mr, mb);
             }
+            // v3.7.0 — S8 (étude PE14 § 2.4-5) : les marges RELATIVES
+            // survivaient pliées en left/right (destruction RTL du
+            // préprocesseur, retirée) ; posées APRÈS les absolues via
+            // setMarginStart/setMarginEnd, elles l'emportent sur leur
+            // côté (miroir de la lecture AOSP) et DirectionRendu les
+            // résoudra sur left/right au layout, selon la direction.
+            appliquerMargesRelatives(mlp, marginStart, marginEnd);
         }
 
         return lp;
+    }
+
+    /**
+     * Pose les marges RELATIVES {@code layout_marginStart/End} sur les
+     * LayoutParams (v3.7.0 — seam TESTABLE : l'android.jar mockable rend
+     * {@code setMarginStart} invisible aux tests, les verify Mockito du
+     * passe-plat attestent l'application, patron « stubs/verify »).
+     *
+     * @param lp          les LayoutParams à marge
+     * @param marginStart la valeur lue (ou null)
+     * @param marginEnd   la valeur lue (ou null)
+     */
+    void appliquerMargesRelatives(ViewGroup.MarginLayoutParams lp,
+                                   String marginStart, String marginEnd) {
+        if (marginStart != null) {
+            lp.setMarginStart(parseDimension(marginStart));
+        }
+        if (marginEnd != null) {
+            lp.setMarginEnd(parseDimension(marginEnd));
+        }
     }
 
     /**
@@ -2451,6 +2608,72 @@ public class BridgeInflater {
         // cohérente avec l'état de capture des contraintes
         factoryViewCount = 0;
         layoutTransitionCount = 0;
+        // v3.7.0 — VIEWCOOKIE : nouvel inflat = nouveau document. Le
+        // REGISTRE ACTIF se vide (celui de la RACINE — les vues du rendu
+        // précédent ne fuient pas via la WeakHashMap racine), le site et
+        // les ordinaux repartent de zéro.
+        registreViewCookies.clear();
+        siteCookies = "";
+        ordinalNoeud = 0;
+    }
+
+    /**
+     * Pose le VIEWCOOKIE d'une vue produite (v3.7.0 — étude PE14 § 2.4-4,
+     * S8) : « site:ordinal » dans le registre PARTAGÉ (celui de la racine
+     * — les inflaters enfants héritent par {@link #setContexteCookie}).
+     *
+     * @param vue     la vue produite
+     * @param ordinal le rang du START_TAG dans la marche du document
+     * @param site    la chaîne des {@code <include>} traversés
+     */
+    private void poserCookie(View vue, int ordinal, String site) {
+        if (registreViewCookies != null) {
+            registreViewCookies.put(vue, site + ":" + ordinal);
+        }
+    }
+
+    /**
+     * Le SITE d'un {@code <include>} d'ordinal [ordinal] : la chaîne des
+     * sites courante étendue du rang de l'{@code <include>} — DEUX sites
+     * distincts incluant le MÊME fichier produisent des chaînes distinctes
+     * (les vues identiques restent discernables, l'objet du cookie).
+     *
+     * @param ordinal le rang du START_TAG {@code <include>}
+     * @return le site du document inclus
+     */
+    private String siteDe(int ordinal) {
+        return siteCookies.isEmpty() ? String.valueOf(ordinal)
+                : siteCookies + ">" + ordinal;
+    }
+
+    /**
+     * Le CONTEXTE COOKIE d'un inflater ENFANT (v3.7.0 — appelé par
+     * {@link #parseInclude} et l'aperçu de listes) : le document de l'enfant
+     * vit dans le SITE fourni et ses cookies partagent le REGISTRE de la
+     * RACINE (toutes les vues d'un rendu au même endroit).
+     *
+     * @param site    le site du document enfant
+     * @param registre le registre partagé (celui de la racine)
+     */
+    void setContexteCookie(String site, java.util.Map<View, String> registre) {
+        this.siteCookies = site == null ? "" : site;
+        this.registreViewCookies = registre != null ? registre : viewCookies;
+    }
+
+    /**
+     * Les VIEWCOOKIES du DERNIER rendu (v3.7.0 — miroir du cookie
+     * {@code ViewInfo} de la référence) : chaque vue inflatée → l'identité
+     * de son NŒUD XML SOURCE (« site:ordinal »). Consommé par
+     * {@link ViewInfoCollector} pour porter le cookie jusqu'à l'IDE —
+     * l'appariement sélection/surlignage se fait par IDENTITÉ (un écart
+     * de compte — include natif, ViewStub, rangée d'adapter — ne désarme
+     * plus la suite du document).
+     *
+     * @return le registre VIVANT (WeakHashMap — ne PAS le conserver au-delà
+     *         du rendu courant)
+     */
+    public java.util.Map<View, String> getViewCookies() {
+        return registreViewCookies;
     }
 
     /**

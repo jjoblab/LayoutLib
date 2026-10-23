@@ -17,6 +17,7 @@ tasks.register("testAllModules") {
         ":module-themes:test",
         ":module-attributes:test",
         ":module-layout:test",
+        ":module-compose:test",
         ":validation:test"
     )
 }
