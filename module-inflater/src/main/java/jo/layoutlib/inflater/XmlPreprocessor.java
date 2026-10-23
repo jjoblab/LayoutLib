@@ -23,6 +23,13 @@ import java.util.regex.Pattern;
  *       {@code android:*} lorsque c'est pertinent (ex. {@code tools:text}
  *       devient {@code android:text}). Cette convention permet au designer
  *       d'afficher du contenu de prévisualisation sans impacter l'app réelle.</li>
+ *   <li>Conservation des attributs de PREVIEW DE LISTES (v3.6.0 — étude
+ *       PE14 § 2.4-3) : {@code tools:listitem}, {@code tools:itemCount},
+ *       {@code tools:listheader} et {@code tools:listfooter} restent dans
+ *       le flux (lus par {@code BridgeInflater.brancherApercuListe} via
+ *       l'URI <em>tools</em>), la déclaration {@code xmlns:tools} est
+ *       conservée AVANT CEUX-CI pour que le parseur noms-espace les
+ *       accepte — miroir du {@code TOOLS_URI} de la référence.</li>
  *   <li>Conversion de {@code layout_marginStart} en {@code layout_marginLeft}
  *       et {@code layout_marginEnd} en {@code layout_marginRight} pour
  *       assurer la compatibilité avec l'API de layout historique.</li>
@@ -45,8 +52,17 @@ public final class XmlPreprocessor {
     private static final Pattern TOOLS_ATTR_PATTERN =
             Pattern.compile("tools:(text|textColor|visibility|layout_width|layout_height|src|background)\\s*=\\s*\"([^\"]*)\"");
 
-    /** Pattern pour identifier les attributs tools:* restants (à stripper). */
+    /** Pattern pour identifier les attributs tools:* restants (à stripper)
+     * — SAUF les attributs de preview de listes (v3.6.0) qui doivent
+     * survivre jusqu'au parser. */
     private static final Pattern TOOLS_ATTR_STRIP_PATTERN =
+            Pattern.compile("\\s+tools:(?!listitem\\b|itemCount\\b|listheader\\b|listfooter\\b)"
+                    + "[a-zA-Z_]+\\s*=\\s*\"[^\"]*\"");
+
+    /** Pattern pour identifier un ATTRIBUT tools:* quelconque (pour la
+     * décision de garder xmlns:tools — v3.6.0). Ne touche pas la
+     * DÉCLARATION xmlns:tools (caractère ':' avant, jamais une espace). */
+    private static final Pattern TOOLS_ATTR_PRESENT_PATTERN =
             Pattern.compile("\\s+tools:[a-zA-Z_]+\\s*=\\s*\"[^\"]*\"");
 
     /** Pattern pour identifier la déclaration xmlns:tools. */
@@ -89,13 +105,15 @@ public final class XmlPreprocessor {
             throw new IllegalArgumentException("Le XML source ne peut pas être null ou vide");
         }
         String result = xmlSource;
-        result = stripXmlnsTools(result);
         result = convertToolsAttributes(result);
-        // v3.4.5 — stripper les attributs tools:* restants (context, listitem,
-        // itemCount, showIn, etc.) qui ne sont pas convertis. Sans ça, le
-        // parseur XML lève "Undefined Prefix: tools" car xmlns:tools est
-        // déjà supprimé.
+        // v3.4.5 — stripper les attributs tools:* restants (context,
+        // showIn, etc.) qui ne sont pas convertis ; v3.6.0 — les attributs
+        // de PREVIEW DE LISTES (listitem/itemCount/listheader/listfooter)
+        // SURVIVENT : BridgeInflater les lit via l'URI tools.
         result = stripRemainingToolsAttributes(result);
+        // v3.6.0 — la déclaration xmlns:tools ne part que si PLUS AUCUN
+        // attribut tools: ne survit (sinon « Undefined Prefix: tools »).
+        result = stripXmlnsTools(result);
         result = convertMarginStart(result);
         result = convertMarginEnd(result);
         result = convertPaddingStart(result);
@@ -104,13 +122,22 @@ public final class XmlPreprocessor {
     }
 
     /**
-     * Supprime la déclaration {@code xmlns:tools}.
+     * Supprime la déclaration {@code xmlns:tools} — SAUF si des attributs
+     * {@code tools:*} survivent encore (v3.6.0 — preview de listes) : la
+     * déclaration est alors nécessaire pour que le parser namespace-aware
+     * accepte le préfixe.
      *
-     * @param xml le XML source
-     * @return le XML sans la déclaration xmlns:tools
+     * @param xml le XML source (après conversion et strip des tools:*
+     *            non-listes)
+     * @return le XML sans la déclaration superflue, ou intact si des
+     *         attributs tools: restent
      */
     private static String stripXmlnsTools(String xml) {
-        return XMLNS_TOOLS_PATTERN.matcher(xml).replaceAll("");
+        String sansDeclaration = XMLNS_TOOLS_PATTERN.matcher(xml).replaceAll("");
+        if (TOOLS_ATTR_PRESENT_PATTERN.matcher(sansDeclaration).find()) {
+            return xml;
+        }
+        return sansDeclaration;
     }
 
     /**
@@ -126,15 +153,17 @@ public final class XmlPreprocessor {
 
     /**
      * v3.4.5 — Supprime les attributs {@code tools:*} restants qui n'ont pas
-     * été convertis (ex: {@code tools:context}, {@code tools:listitem},
-     * {@code tools:itemCount}, {@code tools:showIn}).
+     * été convertis (ex: {@code tools:context}, {@code tools:showIn}) ;
+     * v3.6.0 — ÉPARGNE {@code tools:listitem}, {@code tools:itemCount},
+     * {@code tools:listheader} et {@code tools:listfooter} (preview de
+     * listes, étude PE14 § 2.4-3).
      *
-     * <p>Sans cette étape, le parseur XML lève {@code Undefined Prefix: tools}
-     * car la déclaration {@code xmlns:tools} a déjà été supprimée par
-     * {@link #stripXmlnsTools(String)}.</p>
+     * <p>Sans cette épargne, le parseur XML lèverait (après suppression
+     * éventuelle de xmlns:tools) {@code Undefined Prefix: tools} — ou
+     * pire, les attributs partiraient avant que l'inflater ne les lise.</p>
      *
      * @param xml le XML source (sans xmlns:tools, après conversion)
-     * @return le XML sans aucun attribut tools:*
+     * @return le XML sans les attributs tools:* hors listes
      */
     private static String stripRemainingToolsAttributes(String xml) {
         return TOOLS_ATTR_STRIP_PATTERN.matcher(xml).replaceAll("");

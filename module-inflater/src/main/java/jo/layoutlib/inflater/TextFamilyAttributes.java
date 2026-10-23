@@ -119,6 +119,15 @@ class TextFamilyAttributes implements WidgetAttributes {
     }
 
     void applyTextViewAttributes(TextView tv, XmlPullParser parser) {
+        // v3.6.0 — étude PE14 § 2.4-1 (S7) : textAppearance AVANT les
+        // attributs du tag — l'apparence pose les défauts typographiques,
+        // les attributs propres (textSize/textColor…) l'emportent ensuite
+        // (sémantique Android).
+        String textAppearance = applier.getAttr(parser, "textAppearance");
+        if (textAppearance != null) {
+            applier.appliquerTextAppearance(tv, textAppearance);
+        }
+
         String text = applier.getAttr(parser, "text");
         if (text != null) {
             if (text.startsWith("@string/")) {

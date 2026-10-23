@@ -219,10 +219,17 @@ public class ViewInfoCollector {
         int absLeft   = view.getLeft()   + offsetX;
         int absTop    = view.getTop()    + offsetY;
 
-        // Enfants — on propage l'offset cumulé (absLeft/absTop du parent)
+        // Enfants — on propage l'offset cumulé (absLeft/absTop du parent).
+        // v3.6.0 — étude PE14 § 2.4-3 (S6) : les enfants d'un
+        // AdapterView/RecyclerView sont TOUJOURS des rangées
+        // SYNTHÉTISÉES par l'adaptateur d'aperçu (le XML ne peut pas en
+        // porter — v3.5.2 les détache) : la collecte du DOCUMENT ne
+        // descend PAS (miroir Android Studio, où le cookie distingue les
+        // rangées ; ici la contractuelle collecte==arbre reste vraie et
+        // la pastille « rendue • n vues » compte le contenu du projet).
         List<ViewInfo> children = new ArrayList<>();
         boolean isViewGroup = view instanceof ViewGroup;
-        if (isViewGroup) {
+        if (isViewGroup && !estConteneurAdapteur(view)) {
             ViewGroup group = (ViewGroup) view;
             for (int i = 0; i < group.getChildCount(); i++) {
                 ViewInfo child = collectInternal(group.getChildAt(i), depth + 1, group,
@@ -234,6 +241,17 @@ public class ViewInfoCollector {
         }
 
         return snapshot(view, depth, parent, offsetX, offsetY, children, isViewGroup);
+    }
+
+    /**
+     * Un conteneur dont les enfants viennent de l'ADAPTATEUR (v3.6.0) :
+     * jamais des nœuds du document. AdapterView (ListView, GridView,
+     * Spinner…) par classe ; RecyclerView (embarquée v3.4.9, n'est pas
+     * un AdapterView) par type.
+     */
+    private static boolean estConteneurAdapteur(View view) {
+        return view instanceof android.widget.AdapterView<?>
+                || view instanceof androidx.recyclerview.widget.RecyclerView;
     }
 
     /**

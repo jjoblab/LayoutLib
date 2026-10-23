@@ -312,6 +312,12 @@ public class RenderService {
         if (applier != null) {
             applier.setThemeResolver(themeResolver);
         }
+        // v3.6.0 — le résid du thème projet peut BOUGER avec le résolveur
+        // (nouvelles themes.xml → nouvelle chaîne d'héritage) ; la
+        // re-résolution est DÉTERMINISTE (même nom → même ancêtre).
+        if (nomThemeProjet != null) {
+            appliquerThemeProjet(nomThemeProjet);
+        }
     }
 
     /**
@@ -322,11 +328,63 @@ public class RenderService {
     }
 
     /**
+     * Pose le THÈME PRÉVISUALISÉ DU PROJET (v3.6.0 — étude PE14 § 2.4-2,
+     * S7 du plan) : résout l'ancêtre RÉSOLVABLE du thème (via
+     * {@link jo.layoutlib.themes.ThemeContexteResolver} et le
+     * {@link ThemeResolver} courant), enveloppe le contexte de rendu et
+     * reconstruit l'applier dessous — les vues instancées portent enfin
+     * les styles PAR DÉFAUT de la famille (buttonStyle, editTextStyle…)
+     * contre le thème du projet, pas celui de l'hôte.
+     *
+     * <p>Appelable AVANT le résolveur de thèmes (le résid ne sera résolu
+     * qu'à sa pose) ; un thème non résoluble RETOMBE au thème hôte
+     * (comportement d'avant v3.6.0, jamais d'échec).</p>
+     *
+     * @param themeName le nom du thème du projet (ou {@code null} pour
+     *                  rétablir le thème hôte)
+     */
+    public void setThemeDuProjet(String themeName) {
+        ensureNotReleased();
+        this.nomThemeProjet = themeName;
+        appliquerThemeProjet(themeName);
+    }
+
+    /** Nom du thème projet posé (v3.6.0) — re-résolu au changement de
+     * résolveur. */
+    private String nomThemeProjet;
+
+    /** Résid du thème projet appliqué en dernier (v3.6.0). */
+    private int dernierThemeResid = 0;
+
+    /** Contexte de rendu effectif — enveloppé du thème projet (v3.6.0). */
+    private Context contexteRendu;
+
+    /** Le thème projet effectif : résid résolu + contexte enveloppé. */
+    private void appliquerThemeProjet(String themeName) {
+        if (context == null) {
+            return;
+        }
+        int resid = themeName == null
+                ? 0
+                : jo.layoutlib.themes.ThemeContexteResolver.resIdResolvable(
+                        context, themeResolver, themeName);
+        inflater.setThemeProjet(resid);
+        if (resid != dernierThemeResid) {
+            this.dernierThemeResid = resid;
+            this.contexteRendu = resid == 0
+                    ? context
+                    : jo.layoutlib.themes.ThemeContexteResolver.envelopper(context, resid);
+            rebuildAttributeApplier();
+        }
+    }
+
+    /**
      * Reconstruit l'{@link AttributeApplier} avec le convertisseur et le
      * résolveur courants, et l installe dans le inflater.
      */
     private void rebuildAttributeApplier() {
-        AttributeApplier applier = new AttributeApplier(context,
+        Context contexteApplier = contexteRendu != null ? contexteRendu : context;
+        AttributeApplier applier = new AttributeApplier(contexteApplier,
                 dimensionConverter, resourceResolver);
         applier.setDrawableResolver(drawableResolver);
         applier.setThemeResolver(themeResolver);
@@ -356,6 +414,7 @@ public class RenderService {
         callback = null;
         inflater.reset();
         context = null;
+        contexteRendu = null;
     }
 
     /**

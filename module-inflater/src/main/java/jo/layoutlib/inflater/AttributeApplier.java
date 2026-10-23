@@ -999,6 +999,183 @@ public final class AttributeApplier {
     }
 
     /**
+     * Applique {@code android:textAppearance} (v3.6.0 — étude PE14 § 2.4-1,
+     * S7 du plan).
+     *
+     * <p>Avant v3.6.0 l'attribut était IGNORÉ en silence (0 occurrence
+     * projet — l'audit § 2.4-1 de l'étude le classe « plus gros écart de
+     * fidélité » avec les défauts de famille). Résolution du style par
+     * référence — miroir de {@link #applyStyle} :</p>
+     * <ol>
+     *   <li>{@code ?attr/textAppearanceX} / {@code ?android:attr/…} —
+     *       résolu par le {@link ThemeResolver} (valeur du thème = nom ou
+     *       référence du style) ;</li>
+     *   <li>{@code @style/X} / {@code @android:style/X} — identifiant
+     *       cherché dans les resources de l'HÔTE (styles framework et des
+     *       bibliothèques embarquées) puis du framework ;</li>
+     *   <li>introuvable dans l'hôte → chaîne d'héritage du PROJET via
+     *       {@code ThemeResolver.getStyleAttribute}, vocabulaire
+     *       d'apparence (textSize, textColor, textColorHint, textStyle,
+     *       fontFamily, textAllCaps, letterSpacing).</li>
+     * </ol>
+     *
+     * <p>Sémantique Android : l'apparence est posée AVANT les attributs
+     * propres du tag — ces derniers l'emportent toujours (garanti par
+     * l'appelant {@code TextFamilyAttributes}).</p>
+     *
+     * @param tv  le TextView cible
+     * @param ref la référence du style d'apparence
+     */
+    void appliquerTextAppearance(TextView tv, String ref) {
+        if (ref == null || ref.isEmpty()) {
+            return;
+        }
+        String nomStyle = nomStyleApparence(ref);
+        if (nomStyle == null || nomStyle.isEmpty()) {
+            return;
+        }
+        int styleId = context.getResources().getIdentifier(
+                nomStyle, "style", context.getPackageName());
+        if (styleId == 0) {
+            styleId = context.getResources().getIdentifier(nomStyle, "style", "android");
+        }
+        if (styleId != 0) {
+            try {
+                applyTextStyle(tv, styleId);
+            } catch (RuntimeException e) {
+                logAttrError("textAppearance", e);
+            }
+            return;
+        }
+        try {
+            appliquerTextAppearanceViaThemeResolver(tv, nomStyle);
+        } catch (RuntimeException e) {
+            logAttrError("textAppearance", e);
+        }
+    }
+
+    /**
+     * Normalise la référence d'apparence : les formes {@code ?attr/} se
+     * résolvent CONTRE LE THÈME (la valeur du thème est le nom du style),
+     * les références {@code @style/}/{@code @android:style/} perdent leur
+     * préfixe.
+     */
+    private String nomStyleApparence(String ref) {
+        if (!ref.startsWith("?")) {
+            return deprefixerStyle(ref);
+        }
+        if (themeResolver == null) {
+            return null;
+        }
+        Object valeur = themeResolver.resolveAttr(ref);
+        if (valeur instanceof String) {
+            return deprefixerStyle((String) valeur);
+        }
+        return null;
+    }
+
+    /** Retire {@code @style/} et {@code @android:style/}. */
+    private String deprefixerStyle(String ref) {
+        if (ref.startsWith("@android:style/")) {
+            return ref.substring("@android:style/".length());
+        }
+        if (ref.startsWith("@style/")) {
+            return ref.substring("@style/".length());
+        }
+        return ref;
+    }
+
+    /**
+     * Le chemin PROJET de {@code textAppearance} — style absent des
+     * resources hôte (miroir de
+     * {@link #appliquerStyleViaThemeResolver}, vocabulaire d'apparence
+     * uniquement). Chaque valeur se résout avec les MÊMES helpers que les
+     * attributs du tag (couleurs référencées, dimensions {@code @dimen/}).
+     */
+    private void appliquerTextAppearanceViaThemeResolver(TextView tv,
+                                                          String nomStyle) {
+        if (themeResolver == null) {
+            return;
+        }
+        String textSize = themeResolver.getStyleAttribute(nomStyle, "textSize");
+        if (textSize != null) {
+            float taille = parseDim(textSize);
+            if (taille > 0) {
+                tv.setTextSize(TypedValue.COMPLEX_UNIT_PX, taille);
+            }
+        }
+        String textColor = themeResolver.getStyleAttribute(nomStyle, "textColor");
+        if (textColor != null) {
+            applyTextColor(tv, textColor);
+        }
+        String textColorHint =
+                themeResolver.getStyleAttribute(nomStyle, "textColorHint");
+        if (textColorHint != null) {
+            Integer couleur = couleurTexteHint(textColorHint);
+            if (couleur != null) {
+                tv.setHintTextColor(couleur);
+            }
+        }
+        String textStyle = themeResolver.getStyleAttribute(nomStyle, "textStyle");
+        String fontFamily = themeResolver.getStyleAttribute(nomStyle, "fontFamily");
+        int styleDrapeaux = drapeauxTextStyle(textStyle);
+        if (fontFamily != null) {
+            tv.setTypeface(Typeface.create(fontFamily, styleDrapeaux));
+        } else if (styleDrapeaux != Typeface.NORMAL) {
+            tv.setTypeface(tv.getTypeface(), styleDrapeaux);
+        }
+        String textAllCaps =
+                themeResolver.getStyleAttribute(nomStyle, "textAllCaps");
+        if (textAllCaps != null) {
+            tv.setAllCaps("true".equals(textAllCaps));
+        }
+        String letterSpacing =
+                themeResolver.getStyleAttribute(nomStyle, "letterSpacing");
+        if (letterSpacing != null) {
+            try {
+                tv.setLetterSpacing(Float.parseFloat(letterSpacing));
+            } catch (NumberFormatException e) {
+                logAttrError("textAppearance.letterSpacing", e);
+            }
+        }
+    }
+
+    /**
+     * La couleur de hint d'apparence — hex littéral, référence
+     * {@code @color/} ou thème {@code ?attr/} (miroir des branches de
+     * {@link #applyTextColor}, pour le hint).
+     */
+    private Integer couleurTexteHint(String valeur) {
+        try {
+            if (valeur.startsWith("#")) {
+                return ColorParser.parse(valeur);
+            }
+            if (valeur.startsWith("?attr/") || valeur.startsWith("?android:attr/")) {
+                return resolveThemeAttr(valeur);
+            }
+            return resolveColor(valeur);
+        } catch (RuntimeException e) {
+            logAttrError("textAppearance.textColorHint", e);
+            return null;
+        }
+    }
+
+    /** Les drapeaux Typeface d'une valeur textStyle (« bold|italic »). */
+    private int drapeauxTextStyle(String textStyle) {
+        if (textStyle == null) {
+            return Typeface.NORMAL;
+        }
+        int style = Typeface.NORMAL;
+        if (textStyle.contains("bold")) {
+            style |= Typeface.BOLD;
+        }
+        if (textStyle.contains("italic")) {
+            style |= Typeface.ITALIC;
+        }
+        return style;
+    }
+
+    /**
      * Journalise une erreur d'attribut sans interrompre le rendu.
      *
      * <p>Conformément au contrat du pipeline : une erreur sur un attribut

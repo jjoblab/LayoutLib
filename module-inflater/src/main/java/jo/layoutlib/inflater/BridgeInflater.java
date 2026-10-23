@@ -8,6 +8,10 @@ import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AbsListView;
+import android.widget.AdapterView;
+import android.widget.ExpandableListView;
+import android.widget.ListView;
 
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
@@ -18,8 +22,14 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
 
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
 import jo.layoutlib.inflater.bridge.MockView;
 import jo.layoutlib.inflater.bridge.android.NopAttributeSet;
+import jo.layoutlib.inflater.bridge.binding.AdapterHelper;
+import jo.layoutlib.inflater.bridge.binding.FakeAdapter;
+import jo.layoutlib.inflater.bridge.binding.FakeRecyclerAdapter;
 import jo.layoutlib.resources.ResourceResolver;
 
 /**
@@ -55,8 +65,10 @@ import jo.layoutlib.resources.ResourceResolver;
  * <ul>
  *   <li>Pas de support du renderer complet (mesure/layout/draw) — c'est le
  *       travail du module-layout.</li>
- *   <li>Pas de support des adapters (ListView/RecyclerView) au moment de
- *       l'inflation.</li>
+ *   <li>Support des adapters (v3.6.0) : ListView/GridView/Spinner et
+ *       RecyclerView reçoivent un {@link FakeAdapter} d'aperçu construit
+ *       depuis {@code tools:listitem}/{@code tools:itemCount} (miroir
+ *       {@code AdapterBinding} de la référence — étude PE14 § 2.4-3).</li>
  *   <li>Les attributs custom {@code app:*} sont appliqués via le
  *       module-attributes.</li>
  * </ul>
@@ -68,6 +80,11 @@ public class BridgeInflater {
 
     /** Tag de journalisation. */
     private static final String TAG = "BridgeInflater";
+
+    /** URI de l'espace tools: — convention d'aperçu Android (miroir
+     * TOOLS_URI de la référence). */
+    private static final String URI_TOOLS =
+            "http://schemas.android.com/tools";
 
     /** Contexte Android. */
     private final Context context;
@@ -289,7 +306,10 @@ public class BridgeInflater {
      * Vérifie les attributs du START_TAG courant contre le registre
      * (mode strict uniquement).
      *
-     * <p>Visibilité package : testable unitairement.</p>
+     * <p>Visibilité package : testable unitairement. Les attributs de
+     * l'espace <em>tools</em> (preview de listes v3.6.0) sont IGNORÉS :
+     * ils relèvent de la convention d'aperçu, pas du vocabulaire
+     * {@code android:*}/{@code app:*} du document.</p>
      *
      * @throws InflateException si un attribut est inconnu du registre
      */
@@ -300,6 +320,9 @@ public class BridgeInflater {
         for (int i = 0; i < parser.getAttributeCount(); i++) {
             String name = parser.getAttributeName(i);
             if (name == null || name.isEmpty()) {
+                continue;
+            }
+            if (URI_TOOLS.equals(parser.getAttributeNamespace(i))) {
                 continue;
             }
             if (!attributeRegistry.isKnownAttribute(name)) {
@@ -480,6 +503,15 @@ public class BridgeInflater {
         // est consommé fidèlement — jamais d'exception)
         applyLayoutTransitionIfRequested(view, parser);
 
+        // v3.6.0 — étude PE14 § 2.4-3 (S6) : PREVIEW DE LISTES — le
+        // parser est ENCORE sur START_TAG, les tools:listitem/itemCount/
+        // listheader/listfooter survivent au XmlPreprocessor et se lisent
+        // ici (l'adapter d'aperçu remplit ListView/GridView/Spinner ;
+        // RecyclerView reçoit en plus son LinearLayoutManager par défaut).
+        // Le retour (l'adapter posé) est ignoré du pipeline — il sert aux
+        // tests JVM (l'interception des vues android.jar n'y est pas fiable).
+        brancherApercuListe(view, parser);
+
         // Enregistrement dans la map des ids si la vue a un id
         if (view.getId() != View.NO_ID) {
             idToView.put(view.getId(), view);
@@ -552,6 +584,223 @@ public class BridgeInflater {
         }
     }
 
+    // ====================================================================
+    // v3.6.0 — Preview de listes (étude PE14 § 2.4-3, S6 du plan)
+    // ====================================================================
+
+    /**
+     * Branche le CONTENU D'APERÇU des vues à adaptateur (v3.6.0 — étude
+     * PE14 § 2.4-3, S6 du plan, miroir {@code AdapterBinding}/
+     * {@code setupViewInContext} de la référence).
+     *
+     * <p>Lecture des attributs {@code tools:listitem},
+     * {@code tools:itemCount}, {@code tools:listheader},
+     * {@code tools:listfooter} (le XmlPreprocessor les ÉPARGNE depuis
+     * v3.6.0) :</p>
+     * <ul>
+     *   <li>{@code android:entries} GAGNE — si un vrai adapter est déjà
+     *       posé (attribut appliqué juste avant par l'applier), rien ne
+     *       bouge (précédence d'Android Studio) ;</li>
+     *   <li>{@code tools:listitem} résolu → chaque rangée gonfle LE
+     *       layout référencé (inflater enfant — résolveurs, registre et
+     *       thème projet propagés) ;</li>
+     *   <li>sans {@code tools:listitem} → items TEXTE par défaut
+     *       « Item N » (Android Studio remplit de même une liste nue —
+     *       {@code AdapterHelper.NOMBRE_DEFAUT} borné par les rangées
+     *       VISIBLES, la vraie AdapterView ne demande qu'elles) ;</li>
+     *   <li>{@code ListView} : entête/pied {@code tools:listheader}/
+     *       {@code tools:listfooter} AVANT l'adapter (exigence du
+     *       framework) ;</li>
+     *   <li>{@code RecyclerView} : {@code LinearLayoutManager} vertical
+     *       par défaut (orientation {@code android:orientation}/
+     *       {@code app:orientation} honorée) — une RecyclerView SANS
+     *       LayoutManager est vide, le défaut rend la tuile vivante
+     *       (comportement Android Studio) ;</li>
+     *   <li>{@code ExpandableListView} ÉPUISÉ : son setAdapter jette
+     *       (ExpandableListConnector exigé) — la tuile reste honnêtement
+     *       vide plutôt que de faire échouer le rendu.</li>
+     * </ul>
+     *
+     * <p>Toute défaillance est JOURNALISÉE sans tuer le rendu (miroir de
+     * {@link #attacherSansAbandonner}). Visibilité package : testable
+     * unitairement — RETOURNE l'adapter posé ({@link FakeAdapter} ou
+     * {@link FakeRecyclerAdapter}), ou {@code null} (rien posé) : les
+     * tests JVM l'assertent directement, l'interception Mockito des vues
+     * android.jar n'étant pas fiable depuis le bytecode de production.</p>
+     *
+     * @param view   la vue candidate (AdapterView ou RecyclerView)
+     * @param parser le parser ENCORE sur son START_TAG
+     * @return l'adapter d'aperçu posé, ou {@code null}
+     */
+    Object brancherApercuListe(View view, XmlPullParser parser) {
+        if (view instanceof ExpandableListView) {
+            return null;
+        }
+        if (view instanceof AdapterView<?>) {
+            return brancherAdapterView((AdapterView<?>) view, parser);
+        }
+        if (view instanceof RecyclerView) {
+            return brancherRecyclerView((RecyclerView) view, parser);
+        }
+        return null;
+    }
+
+    /**
+     * Branche un {@link android.widget.AdapterView} (S6).
+     *
+     * @return le {@link FakeAdapter} posé, ou {@code null} (adapter déjà
+     *         présent — {@code android:entries} — ou défaillance journalisée)
+     */
+    private FakeAdapter brancherAdapterView(AdapterView<?> adaptateur,
+                                             XmlPullParser parser) {
+        try {
+            if (adaptateur.getAdapter() != null) {
+                return null;
+            }
+            if (adaptateur instanceof ListView) {
+                attacherEntetesEtPieds((ListView) adaptateur, parser);
+            }
+            FakeAdapter adapteurFake =
+                    new FakeAdapter(lireNombreItems(parser), creerFournisseur(parser));
+            poserFakeAdapter(adaptateur, adapteurFake);
+            return adapteurFake;
+        } catch (RuntimeException e) {
+            Log.w(TAG, "aperçu AdapterView non posé : " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Branche une {@link RecyclerView} (S6) — LM vertical par défaut.
+     *
+     * @return le {@link FakeRecyclerAdapter} posé, ou {@code null}
+     */
+    private FakeRecyclerAdapter brancherRecyclerView(RecyclerView liste,
+                                                       XmlPullParser parser) {
+        try {
+            if (liste.getLayoutManager() == null) {
+                liste.setLayoutManager(new LinearLayoutManager(
+                        contexteRendu(), lireOrientationListe(parser), false));
+            }
+            if (liste.getAdapter() != null) {
+                return null;
+            }
+            FakeRecyclerAdapter adapteur = new FakeRecyclerAdapter(
+                    lireNombreItems(parser), creerFournisseur(parser));
+            liste.setAdapter(adapteur);
+            return adapteur;
+        } catch (RuntimeException e) {
+            Log.w(TAG, "aperçu RecyclerView non posé : " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Pose le FakeAdapter sur N'IMPORTE QUEL AdapterView (ListView,
+     * GridView, Spinner…) : la signature effacée accepte tout
+     * {@code ListAdapter} pour chaque sous-classe (Spinner exige un
+     * SpinnerAdapter — {@code BaseAdapter} implémente les deux, le
+     * FrameworkAdapter brut fait foi).
+     */
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private void poserFakeAdapter(AdapterView brut, FakeAdapter adapter) {
+        brut.setAdapter(adapter);
+    }
+
+    /**
+     * {@code tools:itemCount} bornant les rangées (débit généreux sinon :
+     * la vraie AdapterView ne demande que les rangées visibles).
+     */
+    private int lireNombreItems(XmlPullParser parser) {
+        String brut = getAttributeValue(parser, "tools", "itemCount");
+        if (brut == null) {
+            return AdapterHelper.NOMBRE_DEFAUT;
+        }
+        try {
+            return Math.max(Integer.parseInt(brut.trim()), 0);
+        } catch (NumberFormatException e) {
+            Log.w(TAG, "tools:itemCount non numérique (« " + brut + " ») — défaut");
+            return AdapterHelper.NOMBRE_DEFAUT;
+        }
+    }
+
+    /** L'orientation de la RecyclerView : horizontal si déclarée. */
+    private int lireOrientationListe(XmlPullParser parser) {
+        String orientation = getAttributeValue(parser, "android", "orientation");
+        if (orientation == null) {
+            orientation = getAttributeValue(parser, "app", "orientation");
+        }
+        return "horizontal".equals(orientation)
+                ? LinearLayoutManager.HORIZONTAL : LinearLayoutManager.VERTICAL;
+    }
+
+    /**
+     * La fabrique de rangées : layout {@code tools:listitem} gonflé par un
+     * inflater ENFANT (résolveurs, registre d'attributs, Factory2 et
+     * THÈME PROJET propagés — chaque rangée est rendue comme un document) ;
+     * items texte « Item N » par défaut.
+     */
+    private FakeAdapter.FournisseurVueItem creerFournisseur(XmlPullParser parser) {
+        String reference = getAttributeValue(parser, "tools", "listitem");
+        String xmlItem = reference != null ? resoudreLayoutPourListe(reference) : null;
+        if (xmlItem == null) {
+            if (reference != null) {
+                Log.w(TAG, "tools:listitem non résolu (" + reference
+                        + ") — items texte par défaut");
+            }
+            return AdapterHelper.fournisseurTexteParDefaut(contexteRendu());
+        }
+        BridgeInflater inflaterItems = creerInflaterEnfant();
+        return item -> {
+            try {
+                return inflaterItems.inflate(xmlItem, null);
+            } catch (RuntimeException e) {
+                Log.w(TAG, "rangée d'aperçu non gonflée : " + e.getMessage());
+                return AdapterHelper.fournisseurTexteParDefaut(contexteRendu())
+                        .creerVueItem(item);
+            }
+        };
+    }
+
+    /** Entête/pied de ListView — AVANT l'adapter (exigence framework). */
+    private void attacherEntetesEtPieds(ListView liste, XmlPullParser parser) {
+        View entete = gonflerAnnexeListe(getAttributeValue(parser, "tools", "listheader"));
+        if (entete != null) {
+            liste.addHeaderView(entete, null, false);
+        }
+        View pied = gonflerAnnexeListe(getAttributeValue(parser, "tools", "listfooter"));
+        if (pied != null) {
+            liste.addFooterView(pied, null, false);
+        }
+    }
+
+    /** Gonfle l'entête/pied référencé, {@code null} si introuvable. */
+    private View gonflerAnnexeListe(String reference) {
+        if (reference == null) {
+            return null;
+        }
+        String xml = resoudreLayoutPourListe(reference);
+        if (xml == null) {
+            Log.w(TAG, "tools:listheader/listfooter non résolu : " + reference);
+            return null;
+        }
+        try {
+            return creerInflaterEnfant().inflate(xml, null);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "entête/pied d'aperçu non gonflé : " + e.getMessage());
+            return null;
+        }
+    }
+
+    /** Résolution miroir de {@code <include>} : résolveur puis natif. */
+    private String resoudreLayoutPourListe(String reference) {
+        String xml = resolveLayoutReference(reference);
+        if (xml == null) {
+            xml = resolveLayoutNatively(reference);
+        }
+        return xml;
+    }
+
     /**
      * Parse les enfants d'un ViewGroup.
      *
@@ -587,7 +836,10 @@ public class BridgeInflater {
      *                          factory lève
      */
     private View onCreateViewFromFactory(String tag, ViewGroup parent) {
-        return onCreateViewFromFactory(tag, parent, context);
+        // v3.6.0 — instanciation sous le THÈME PROJET (S7) : les styles
+        // par défaut de chaque famille (buttonStyle, editTextStyle…)
+        // se résolvent contre le thème prévisualisé.
+        return onCreateViewFromFactory(tag, parent, contexteRendu());
     }
 
     /**
@@ -753,6 +1005,21 @@ public class BridgeInflater {
         return false;
     }
 
+    /** Cache du contexte de repli Material3 (v3.4.9). */
+    private Context contexteMaterialCache;
+
+    /**
+     * Identifiant du THÈME PROJET résolu (v3.6.0 — étude PE14 § 2.4-2, S7) :
+     * l'ancêtre RÉSOLVABLE du thème prévisualisé (Material3,
+     * MaterialComponents, AppCompat, framework) rendu par
+     * {@code ThemeContexteResolver.resIdResolvable}. {@code 0} = thème
+     * hôte inchangé (comportement d'avant v3.6.0).
+     */
+    private int themeResIdProjet = 0;
+
+    /** Cache du contexte de rendu thématé (v3.6.0). */
+    private Context contexteRenduCache;
+
     /**
      * Le contexte de repli Material3 (paresseux, réutilisé) : un
      * {@link ContextThemeWrapper} posé sur le contexte de l'inflater.
@@ -762,13 +1029,65 @@ public class BridgeInflater {
     private Context contexteMaterial() {
         if (contexteMaterialCache == null) {
             contexteMaterialCache = new ContextThemeWrapper(
-                    context, com.google.android.material.R.style.Theme_Material3_DayNight_NoActionBar);
+                    contexteRendu(), com.google.android.material.R.style.Theme_Material3_DayNight_NoActionBar);
         }
         return contexteMaterialCache;
     }
 
-    /** Cache du contexte de repli Material3 (v3.4.9). */
-    private Context contexteMaterialCache;
+    /**
+     * Pose le THÈME PROJET résolu (v3.6.0 — étude PE14 § 2.4-2, S7 du
+     * plan).
+     *
+     * <p>Le résid vient de
+     * {@code jo.layoutlib.themes.ThemeContexteResolver.resIdResolvable} —
+     * l'ancêtre RESOLVABLE du thème déclaré par le projet (un thème
+     * métier {@code Theme.MonApp} n'existe pas dans les resources de
+     * l'hôte, son parent Material3/AppCompat si). Toutes les vues sont
+     * ensuite INSTANCIÉES sous le contexte enveloppé : leurs constructeurs
+     * ({@code new Button(ctx)} → {@code obtainStyledAttributes(null,
+     * buttonStyle)}) résolvent les styles PAR DÉFAUT de la famille contre
+     * le thème PRÉVISUALISÉ — l'écart de fidélité n° 2 de l'étude
+     * (§ 2.4-2) se referme : un projet MaterialComponents voit enfin ses
+     * boutons Material.</p>
+     *
+     * <p>Appelé AVANT tout rendu (configuration de session — miroir de
+     * {@code RenderService.setThemeDuProjet} côté hôte). {@code 0}
+     * rétablit le thème hôte. Propagé aux inflaters enfants (include,
+     * rangées d'items d'aperçu).</p>
+     *
+     * @param themeResId le résid du thème (peut être {@code 0})
+     */
+    public void setThemeProjet(int themeResId) {
+        if (themeResId == themeResIdProjet) {
+            return;
+        }
+        this.themeResIdProjet = themeResId;
+        this.contexteRenduCache = null;
+        this.contexteMaterialCache = null;
+    }
+
+    /**
+     * @return le résid du thème projet posé (v3.6.0), {@code 0} si aucun
+     */
+    public int getThemeProjet() {
+        return themeResIdProjet;
+    }
+
+    /**
+     * Le contexte d'INSTANCIATION des vues (v3.6.0) : enveloppé du thème
+     * projet si posé, contexte nominal sinon.
+     *
+     * @return le contexte de rendu effectif
+     */
+    Context contexteRendu() {
+        if (themeResIdProjet == 0) {
+            return context;
+        }
+        if (contexteRenduCache == null) {
+            contexteRenduCache = new ContextThemeWrapper(context, themeResIdProjet);
+        }
+        return contexteRenduCache;
+    }
 
     /**
      * Journalise l'échec de création d'une vue — niveau WARNING, pas FINE,
@@ -883,26 +1202,47 @@ public class BridgeInflater {
         parser.nextTag();
 
         // Inflater récursivement le layout inclus
-        BridgeInflater childInflater = new BridgeInflater(context, tagRegistry);
-        childInflater.setResourceResolver(resourceResolver);
-        if (attributeApplier != null) {
-            childInflater.setAttributeApplier(attributeApplier);
-        }
-        // ADR 0116 — P3/L8 : le registre d'attributs (app:*) suit les <include>
-        if (attributeRegistry != null) {
-            childInflater.setAttributeRegistry(attributeRegistry);
-        }
-        // ADR 0116 — P6/L10 : la Factory2 suit les <include> (l'enfant est
-        // neuf, pas de conflit au setFactory2)
-        if (factory2 != null) {
-            childInflater.setFactory2(factory2);
-        }
+        BridgeInflater childInflater = creerInflaterEnfant();
         View firstChild = childInflater.inflate(includedXml, parent);
         // Les compteurs d'introspection (P6/L10-L11) remontent au inflater
         // parent — les <include> ne créent pas de trous de comptage
         this.factoryViewCount += childInflater.getFactoryViewCount();
         this.layoutTransitionCount += childInflater.getAppliedLayoutTransitionCount();
         return firstChild;
+    }
+
+    /**
+     * Un inflater ENFANT de pleins droits (v3.6.0 — factorisation du bloc
+     * {@code <include>}, réutilisée par la preview de listes S6) : résolveur
+     * de ressources, applier d'attributs, registre {@code app:*}, Factory2
+     * et THÈME PROJET (S7) propagés — le contenu inclus/gonflé est rendu
+     * comme le document principal.
+     *
+     * <p>Le mode strict n'est PAS propagé (sémantique historique du
+     * {@code <include>} inchangée — les contrôles stricts restent au
+     * document appelant).</p>
+     *
+     * @return l'inflater enfant prêt à gonfler
+     */
+    private BridgeInflater creerInflaterEnfant() {
+        BridgeInflater enfant = new BridgeInflater(context, tagRegistry);
+        enfant.setResourceResolver(resourceResolver);
+        if (attributeApplier != null) {
+            enfant.setAttributeApplier(attributeApplier);
+        }
+        // ADR 0116 — P3/L8 : le registre d'attributs (app:*) suit les enfants
+        if (attributeRegistry != null) {
+            enfant.setAttributeRegistry(attributeRegistry);
+        }
+        // ADR 0116 — P6/L10 : la Factory2 suit les enfants (l'enfant est
+        // neuf, pas de conflit au setFactory2)
+        if (factory2 != null) {
+            enfant.setFactory2(factory2);
+        }
+        // v3.6.0 — S7 : le thème projet suit les enfants (rangs d'items
+        // d'aperçu comprises)
+        enfant.setThemeProjet(themeResIdProjet);
+        return enfant;
     }
 
     /**
@@ -1439,7 +1779,8 @@ public class BridgeInflater {
      * Lit la valeur d'un attribut depuis le parser en gérant le namespace.
      *
      * @param parser le parser
-     * @param ns     le préfixe de namespace ({@code android} ou {@code app})
+     * @param ns     le préfixe de namespace ({@code android}, {@code app}
+     *               ou {@code tools} — v3.6.0)
      * @param name   le nom de l'attribut
      * @return la valeur, ou {@code null} si l'attribut n'est pas présent
      */
@@ -1449,6 +1790,10 @@ public class BridgeInflater {
             nsUri = "http://schemas.android.com/apk/res/android";
         } else if ("app".equals(ns)) {
             nsUri = "http://schemas.android.com/apk/res-auto";
+        } else if ("tools".equals(ns)) {
+            // v3.6.0 — preview de listes : l'espace tools survit au
+            // XmlPreprocessor quand des attributs tools:list* restent.
+            nsUri = URI_TOOLS;
         } else {
             nsUri = ns;
         }

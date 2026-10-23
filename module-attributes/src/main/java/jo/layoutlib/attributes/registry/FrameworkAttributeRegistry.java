@@ -25,6 +25,10 @@ public class FrameworkAttributeRegistry implements AttributeRegistrySource {
         register("text", new AttributeFormat[]{AttributeFormat.STRING});
         register("textColor", new AttributeFormat[]{AttributeFormat.COLOR});
         register("textSize", new AttributeFormat[]{AttributeFormat.DIMENSION});
+        // v3.6.0 — étude PE14 § 2.4-1 (S7) : textAppearance est HONORÉ par
+        // AttributeApplier (résolution @style/…/?attr/…), il entre au
+        // registre strict.
+        register("textAppearance", new AttributeFormat[]{AttributeFormat.REFERENCE});
         register("background", new AttributeFormat[]{AttributeFormat.REFERENCE, AttributeFormat.COLOR});
         register("padding", new AttributeFormat[]{AttributeFormat.DIMENSION});
         register("paddingLeft", new AttributeFormat[]{AttributeFormat.DIMENSION});

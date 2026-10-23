@@ -41,6 +41,9 @@ dependencies {
     testRuntimeOnly(libs.junit.platform.launcher)
     testImplementation(libs.assertj.core)
     testImplementation(libs.kxml2)
+    // v3.6.0 — ThemeContexteResolver : lookup getIdentifier mocké (le
+    // comportement appareil « projet introuvable, parent trouvé »).
+    testImplementation(libs.mockito.core)
     androidTestImplementation(libs.androidx.test.ext.junit)
 }
 
